@@ -1,0 +1,52 @@
+{
+  "timelineObjects": [
+    {
+      "placeVisit": {
+        "location": {
+          "name": "Coffee Shop",
+          "latitudeE7": 476095000,
+          "longitudeE7": -1223331000
+        },
+        "duration": {
+          "startTimestamp": "2024-01-02T15:00:00Z",
+          "endTimestamp": "2024-01-02T15:45:00Z"
+        },
+        "placeConfidence": "HIGH_CONFIDENCE",
+        "centerLatE7": 476095100,
+        "centerLngE7": -1223330900
+      }
+    },
+    {
+      "activitySegment": {
+        "startLocation": {
+          "latitudeE7": 476095000,
+          "longitudeE7": -1223331000
+        },
+        "endLocation": {
+          "latitudeE7": 476206000,
+          "longitudeE7": -1223209000
+        },
+        "duration": {
+          "startTimestamp": "2024-01-02T15:45:00Z",
+          "endTimestamp": "2024-01-02T16:10:00Z"
+        },
+        "activityType": "WALKING",
+        "confidence": "MEDIUM"
+      }
+    },
+    {
+      "placeVisit": {
+        "location": {
+          "name": "Library",
+          "latitudeE7": 476206000,
+          "longitudeE7": -1223209000
+        },
+        "duration": {
+          "startTimestamp": "2024-01-02T16:10:00Z",
+          "endTimestamp": "2024-01-02T17:25:00Z"
+        },
+        "placeConfidence": "HIGH_CONFIDENCE"
+      }
+    }
+  ]
+}

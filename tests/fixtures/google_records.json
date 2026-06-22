@@ -1,0 +1,23 @@
+{
+  "locations": [
+    {
+      "timestamp": "2024-01-02T15:00:00Z",
+      "latitudeE7": 476095000,
+      "longitudeE7": -1223331000,
+      "accuracy": 12,
+      "activity": [
+        {
+          "activity": [
+            {"type": "STILL", "confidence": 85}
+          ]
+        }
+      ]
+    },
+    {
+      "timestampMs": "1704207900000",
+      "latitudeE7": 476095100,
+      "longitudeE7": -1223330900,
+      "accuracy": 9
+    }
+  ]
+}

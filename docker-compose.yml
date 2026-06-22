@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: mca
+      POSTGRES_USER: mca
+      POSTGRES_PASSWORD: mca
+    ports:
+      - "5432:5432"
+    volumes:
+      - mca-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mca -d mca"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      MCA_DATABASE_URL: postgresql+psycopg://mca:mca@db:5432/mca
+      MCA_USER_HASH_SALT: local-docker-demo-salt
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mca-postgres:

@@ -1,0 +1,5 @@
+timestamp,latitude,longitude,accuracy_m,activity_type,source
+2024-01-02T08:00:00Z,47.609500,-122.333100,10,still,fixture
+2024-01-02T08:05:00Z,47.609530,-122.333080,8,still,fixture
+2024-01-02T08:12:00Z,47.609540,-122.333070,9,still,fixture
+2024-01-02T08:25:00Z,47.620600,-122.320900,12,walking,fixture
