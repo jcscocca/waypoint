@@ -188,6 +188,9 @@ GET /exports/tableau/route-segments.csv
 GET /exports/tableau/route-context.csv
 ```
 
+`route-segments.csv` includes provider/mock route point labels and coordinates for segment
+starts and ends; it does not include raw GPS observations.
+
 OpenTripPlanner is the planned provider for live route alternatives. Until that provider is
 implemented, the mock provider supplies deterministic Stage 1 route alternatives for local
 development, tests, and Tableau dashboard prototyping.

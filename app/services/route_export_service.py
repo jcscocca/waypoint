@@ -19,7 +19,12 @@ def tableau_route_alternatives_csv(session: Session, user_id_hash: str) -> str:
         .join(RouteRequest, RouteRequest.id == RouteAlternative.route_request_id)
         .where(RouteAlternative.user_id_hash == user_id_hash)
         .where(RouteRequest.user_id_hash == user_id_hash)
-        .order_by(RouteRequest.created_at, RouteAlternative.rank, RouteAlternative.id)
+        .order_by(
+            RouteRequest.created_at,
+            RouteRequest.id,
+            RouteAlternative.rank,
+            RouteAlternative.id,
+        )
     ).all()
     return build_route_alternatives_csv(
         [_alternative_row(alternative, request) for alternative, request in rows]
@@ -34,7 +39,14 @@ def tableau_route_segments_csv(session: Session, user_id_hash: str) -> str:
         .where(RouteSegment.user_id_hash == user_id_hash)
         .where(RouteAlternative.user_id_hash == user_id_hash)
         .where(RouteRequest.user_id_hash == user_id_hash)
-        .order_by(RouteRequest.created_at, RouteAlternative.rank, RouteSegment.sequence)
+        .order_by(
+            RouteRequest.created_at,
+            RouteRequest.id,
+            RouteAlternative.rank,
+            RouteAlternative.id,
+            RouteSegment.sequence,
+            RouteSegment.id,
+        )
     ).scalars()
     return build_route_segments_csv([_segment_row(segment) for segment in rows])
 
@@ -49,13 +61,16 @@ def tableau_route_context_csv(session: Session, user_id_hash: str) -> str:
         .where(RouteRequest.user_id_hash == user_id_hash)
         .order_by(
             RouteRequest.created_at,
+            RouteRequest.id,
             RouteAlternative.rank,
+            RouteAlternative.id,
             RouteContextSummary.radius_m,
             RouteContextSummary.context_label,
             RouteContextSummary.context_type,
             RouteContextSummary.offense_category,
             RouteContextSummary.offense_subcategory,
             RouteContextSummary.nibrs_group,
+            RouteContextSummary.id,
         )
     ).scalars()
     return build_route_context_csv([_context_row(summary) for summary in rows])
