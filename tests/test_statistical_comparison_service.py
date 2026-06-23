@@ -1,7 +1,11 @@
-from datetime import date
+from datetime import UTC, date, datetime
 
 from app.analysis.comparison import build_statistical_comparison
 from app.analysis.schemas import AnalysisOptionResult, DecisionClass, GeometryType
+from app.db import get_sessionmaker
+from app.main import create_app
+from app.models import CrimeIncident
+from app.services.analysis_service import compare_site_options
 
 
 def test_build_statistical_comparison_recommends_candidate_only_when_all_pairs_pass():
@@ -271,3 +275,66 @@ def test_build_statistical_comparison_handles_non_positive_exposure_without_rais
     assert result.pairwise_results[0].method == "not_tested_minimum_data"
     assert result.pairwise_results[0].p_value == 1.0
     assert result.pairwise_results[0].adjusted_p_value == 1.0
+
+
+def test_compare_site_options_counts_incidents_persists_and_returns_payload(tmp_path):
+    create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    session = get_sessionmaker()()
+    session.add_all(
+        [
+            CrimeIncident(
+                id=f"a-{index}",
+                offense_start_utc=datetime(2024, 1, 10 + index, tzinfo=UTC),
+                offense_category="PROPERTY",
+                latitude=47.6116,
+                longitude=-122.3372,
+            )
+            for index in range(8)
+        ]
+        + [
+            CrimeIncident(
+                id=f"b-{index}",
+                offense_start_utc=datetime(2024, 1, 1 + (index % 28), tzinfo=UTC),
+                offense_category="PROPERTY",
+                latitude=47.6205,
+                longitude=-122.3493,
+            )
+            for index in range(28)
+        ],
+    )
+    session.commit()
+
+    result = compare_site_options(
+        session=session,
+        user_id_hash="site-user",
+        options=[
+            {
+                "id": "site-a",
+                "label": "Site A",
+                "latitude": 47.6116,
+                "longitude": -122.3372,
+                "radius_m": 250,
+            },
+            {
+                "id": "site-b",
+                "label": "Site B",
+                "latitude": 47.6205,
+                "longitude": -122.3493,
+                "radius_m": 250,
+            },
+        ],
+        analysis_start_date=date(2024, 1, 1),
+        analysis_end_date=date(2024, 1, 31),
+        offense_category="PROPERTY",
+        offense_subcategory=None,
+        nibrs_group=None,
+    )
+
+    assert result["overview"]["decision_class"] == "statistically_lower"
+    assert result["overview"]["recommendation_label"] == "Site A"
+    assert result["analytical"]["pairwise_results"][0]["method"] in {
+        "exact_conditional_poisson",
+        "quasi_poisson_log_rate_ratio",
+    }
+    assert result["id"]
+    session.close()

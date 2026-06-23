@@ -1,0 +1,116 @@
+from datetime import UTC, datetime
+
+from fastapi.testclient import TestClient
+
+from app.db import get_sessionmaker
+from app.main import create_app
+from app.models import CrimeIncident
+
+
+def test_site_comparison_api_returns_overview_and_analytical_payload(tmp_path):
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+    session = get_sessionmaker()()
+    session.add_all(
+        [
+            CrimeIncident(
+                id=f"a-{index}",
+                offense_start_utc=datetime(2024, 1, 10 + index, tzinfo=UTC),
+                offense_category="PROPERTY",
+                latitude=47.6116,
+                longitude=-122.3372,
+            )
+            for index in range(8)
+        ]
+        + [
+            CrimeIncident(
+                id=f"b-{index}",
+                offense_start_utc=datetime(2024, 1, 1 + (index % 28), tzinfo=UTC),
+                offense_category="PROPERTY",
+                latitude=47.6205,
+                longitude=-122.3493,
+            )
+            for index in range(28)
+        ],
+    )
+    session.commit()
+    session.close()
+
+    response = client.post(
+        "/analysis/sites/compare",
+        json={
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "offense_category": "PROPERTY",
+            "options": [
+                {
+                    "id": "site-a",
+                    "label": "Site A",
+                    "latitude": 47.6116,
+                    "longitude": -122.3372,
+                    "radius_m": 250,
+                },
+                {
+                    "id": "site-b",
+                    "label": "Site B",
+                    "latitude": 47.6205,
+                    "longitude": -122.3493,
+                    "radius_m": 250,
+                },
+            ],
+        },
+        headers={"X-Demo-User-Id": "analysis-user@example.com"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["overview"]["label"] == "Overview"
+    assert payload["analytical"]["label"] == "Analytical"
+    assert payload["overview"]["decision_class"] == "statistically_lower"
+    assert "safe" not in payload["overview"]["summary_text"].lower()
+    assert payload["analytical"]["pairwise_results"][0]["adjusted_p_value"] < 0.05
+
+    lookup = client.get(
+        f"/analysis/comparisons/{payload['id']}",
+        headers={"X-Demo-User-Id": "analysis-user@example.com"},
+    )
+    assert lookup.status_code == 200
+    assert lookup.json()["id"] == payload["id"]
+
+
+def test_statistical_comparison_lookup_is_scoped_to_user(tmp_path):
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+
+    response = client.post(
+        "/analysis/sites/compare",
+        json={
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-15",
+            "options": [
+                {
+                    "id": "a",
+                    "label": "A",
+                    "latitude": 47.6116,
+                    "longitude": -122.3372,
+                    "radius_m": 250,
+                },
+                {
+                    "id": "b",
+                    "label": "B",
+                    "latitude": 47.6205,
+                    "longitude": -122.3493,
+                    "radius_m": 250,
+                },
+            ],
+        },
+        headers={"X-Demo-User-Id": "analysis-user@example.com"},
+    )
+    assert response.status_code == 200
+
+    lookup = client.get(
+        f"/analysis/comparisons/{response.json()['id']}",
+        headers={"X-Demo-User-Id": "other-user@example.com"},
+    )
+
+    assert lookup.status_code == 404
