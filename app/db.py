@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
@@ -17,6 +17,12 @@ _engine = None
 _session_local: sessionmaker[Session] | None = None
 
 
+def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
 def configure_database(database_url: str | None = None) -> None:
     global _engine, _session_local
     url = database_url or get_settings().database_url
@@ -26,6 +32,8 @@ def configure_database(database_url: str | None = None) -> None:
             Path(sqlite_path).parent.mkdir(parents=True, exist_ok=True)
     connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
     _engine = create_engine(url, connect_args=connect_args, future=True)
+    if url.startswith("sqlite"):
+        event.listen(_engine, "connect", _enable_sqlite_foreign_keys)
     _session_local = sessionmaker(_engine, autoflush=False, autocommit=False, future=True)
 
 
