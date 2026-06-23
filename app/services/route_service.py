@@ -17,7 +17,12 @@ from app.models import (
 from app.routing.context import summarize_route_context
 from app.routing.place_resolver import resolve_route_place
 from app.routing.providers import get_routing_provider
-from app.routing.schemas import RouteContextSummaryData, RouteRequestCreate, RouteRequestData
+from app.routing.schemas import (
+    RouteAlternativeData,
+    RouteContextSummaryData,
+    RouteRequestCreate,
+    RouteRequestData,
+)
 from app.schemas import CrimeIncidentData
 from app.services.analysis_service import compare_route_request, latest_route_comparison_payload
 
@@ -135,20 +140,13 @@ def create_route_alternatives(
 
     session.commit()
 
-    if (
-        route_request.analysis_start_date
-        and route_request.analysis_end_date
-        and request_payload.radii_m
-        and len(route_alternatives) >= 2
-    ):
-        compare_route_request(
-            session=session,
-            user_id_hash=user_id_hash,
-            request=RouteComparisonRequest(
-                route_request_id=route_request.id,
-                radius_m=request_payload.radii_m[0],
-            ),
-        )
+    _create_route_statistical_comparison_if_possible(
+        session=session,
+        route_request=route_request,
+        route_alternatives=route_alternatives,
+        request_payload=request_payload,
+        user_id_hash=user_id_hash,
+    )
     return get_route_comparison(session, route_request.id, user_id_hash) or {}
 
 
@@ -187,6 +185,35 @@ def get_route_comparison(
         "statistical_comparison": statistical_comparison,
     }
     return payload
+
+
+def _create_route_statistical_comparison_if_possible(
+    *,
+    session: Session,
+    route_request: RouteRequest,
+    route_alternatives: list[RouteAlternativeData],
+    request_payload: RouteRequestCreate,
+    user_id_hash: str,
+) -> None:
+    if (
+        route_request.analysis_start_date is None
+        or route_request.analysis_end_date is None
+        or not request_payload.radii_m
+        or len(route_alternatives) < 2
+    ):
+        return
+    try:
+        compare_route_request(
+            session=session,
+            user_id_hash=user_id_hash,
+            request=RouteComparisonRequest(
+                route_request_id=route_request.id,
+                radius_m=request_payload.radii_m[0],
+            ),
+        )
+    except ValueError:
+        session.rollback()
+        return
 
 
 def _sort_alternatives_for_payload(

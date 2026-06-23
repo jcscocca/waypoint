@@ -21,6 +21,7 @@ STATISTICAL_COMPARISON_COLUMNS = [
     "analysis_end_date",
     "offense_category",
     "offense_subcategory",
+    "nibrs_group",
     "incident_count_a",
     "incident_count_b",
     "exposure_a",

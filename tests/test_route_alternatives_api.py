@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from app.db import get_sessionmaker
 from app.main import create_app
 from app.models import RouteContextSummary
+from app.routing.schemas import RouteAlternativeData, RouteSegmentData
 from app.services.users import hash_demo_user
 
 
@@ -339,3 +340,89 @@ def test_route_alternatives_skips_statistical_comparison_for_single_alternative(
     payload = response.json()
     assert len(payload["alternatives"]) == 1
     assert payload["statistical_comparison"] is None
+
+
+def test_route_alternatives_skips_statistical_comparison_for_unanalyzable_geometry(
+    tmp_path,
+    monkeypatch,
+):
+    class BadGeometryProvider:
+        def get_routes(self, request):
+            return [
+                _bad_geometry_alternative(
+                    request_id=request.id,
+                    provider_route_id="bad-geometry-a",
+                    label="Bad geometry A",
+                    rank=1,
+                ),
+                _bad_geometry_alternative(
+                    request_id=request.id,
+                    provider_route_id="bad-geometry-b",
+                    label="Bad geometry B",
+                    rank=2,
+                ),
+            ]
+
+    monkeypatch.setattr(
+        "app.services.route_service.get_routing_provider",
+        lambda provider_name: BadGeometryProvider(),
+    )
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+    headers = {"X-Demo-User-Id": "route-stat-bad-geometry-user@example.com"}
+    client.post("/crime/ingest/sample")
+
+    response = client.post(
+        "/routes/alternatives",
+        json={
+            "origin_label": "Capitol Hill",
+            "destination_label": "Downtown Seattle",
+            "mode": "transit",
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "radii_m": [500],
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["alternatives"]) == 2
+    assert payload["statistical_comparison"] is None
+
+
+def _bad_geometry_alternative(
+    *,
+    request_id: str,
+    provider_route_id: str,
+    label: str,
+    rank: int,
+) -> RouteAlternativeData:
+    alternative = RouteAlternativeData(
+        route_request_id=request_id,
+        provider_route_id=provider_route_id,
+        route_label=label,
+        rank=rank,
+        duration_minutes=12 + rank,
+        distance_m=1000,
+        transfer_count=0,
+        walking_distance_m=200,
+        mode_mix="transit",
+        summary_geometry=None,
+        provider="mock",
+    )
+    alternative.segments = [
+        RouteSegmentData(
+            route_alternative_id=alternative.id,
+            sequence=1,
+            segment_type="direct",
+            mode="transit",
+            start_label="Capitol Hill",
+            start_latitude=47.6193,
+            start_longitude=-122.3193,
+            end_label="Downtown Seattle",
+            end_latitude=47.6097,
+            end_longitude=-122.3331,
+        )
+    ]
+    return alternative

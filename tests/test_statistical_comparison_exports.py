@@ -22,6 +22,7 @@ def test_statistical_comparison_tableau_export_includes_site_pairwise_results(tm
                 id=f"site-a-property-{index}",
                 offense_start_utc=datetime(2024, 1, 1 + index, tzinfo=UTC),
                 offense_category="PROPERTY",
+                nibrs_group="A",
                 latitude=47.6116,
                 longitude=-122.3372,
             )
@@ -32,6 +33,7 @@ def test_statistical_comparison_tableau_export_includes_site_pairwise_results(tm
                 id=f"site-b-property-{index}",
                 offense_start_utc=datetime(2024, 1, 1 + index, tzinfo=UTC),
                 offense_category="PROPERTY",
+                nibrs_group="A",
                 latitude=47.6205,
                 longitude=-122.3493,
             )
@@ -47,6 +49,7 @@ def test_statistical_comparison_tableau_export_includes_site_pairwise_results(tm
             "analysis_start_date": "2024-01-01",
             "analysis_end_date": "2024-01-31",
             "offense_category": "PROPERTY",
+            "nibrs_group": "A",
             "options": [
                 {
                     "id": "site-a",
@@ -84,6 +87,7 @@ def test_statistical_comparison_tableau_export_includes_site_pairwise_results(tm
     rows = list(reader)
     assert rows
     assert rows[0]["comparison_id"] == comparison_id
+    assert rows[0]["nibrs_group"] == "A"
     assert rows[0]["decision_class"] in {
         "statistically_lower",
         "not_statistically_clear",

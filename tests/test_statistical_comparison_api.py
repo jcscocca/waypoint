@@ -200,3 +200,69 @@ def test_site_comparison_api_returns_400_for_reversed_dates(tmp_path):
 
     assert response.status_code == 400
     assert "analysis_end_date" in response.json()["detail"]
+
+
+def test_site_comparison_api_rejects_duplicate_option_ids(tmp_path):
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+
+    response = client.post(
+        "/analysis/sites/compare",
+        json={
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "options": [
+                {
+                    "id": "duplicate",
+                    "label": "A",
+                    "latitude": 47.6116,
+                    "longitude": -122.3372,
+                    "radius_m": 250,
+                },
+                {
+                    "id": "duplicate",
+                    "label": "B",
+                    "latitude": 47.6205,
+                    "longitude": -122.3493,
+                    "radius_m": 250,
+                },
+            ],
+        },
+        headers={"X-Demo-User-Id": "analysis-user@example.com"},
+    )
+
+    assert response.status_code == 422
+    assert "unique" in str(response.json()["detail"]).lower()
+
+
+def test_site_comparison_api_rejects_mixed_option_radii(tmp_path):
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+
+    response = client.post(
+        "/analysis/sites/compare",
+        json={
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "options": [
+                {
+                    "id": "a",
+                    "label": "A",
+                    "latitude": 47.6116,
+                    "longitude": -122.3372,
+                    "radius_m": 250,
+                },
+                {
+                    "id": "b",
+                    "label": "B",
+                    "latitude": 47.6205,
+                    "longitude": -122.3493,
+                    "radius_m": 500,
+                },
+            ],
+        },
+        headers={"X-Demo-User-Id": "analysis-user@example.com"},
+    )
+
+    assert response.status_code == 422
+    assert "radius" in str(response.json()["detail"]).lower()

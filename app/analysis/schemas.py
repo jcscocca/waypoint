@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas import new_id
 
@@ -61,6 +61,16 @@ class SiteComparisonRequest(BaseModel):
     offense_category: str | None = None
     offense_subcategory: str | None = None
     nibrs_group: str | None = None
+
+    @model_validator(mode="after")
+    def validate_option_identity_and_radius(self) -> SiteComparisonRequest:
+        option_ids = [option.id for option in self.options]
+        if len(set(option_ids)) != len(option_ids):
+            raise ValueError("Site comparison option ids must be unique.")
+        radii = {option.radius_m for option in self.options}
+        if len(radii) > 1:
+            raise ValueError("Site comparison options must use the same radius.")
+        return self
 
 
 class RouteComparisonRequest(BaseModel):

@@ -62,8 +62,8 @@ when it passes the conservative threshold against every relevant alternative.
 ## Dashboard Modes
 
 Overview is the public summary view. It shows the reader-facing summary text, the decision
-class, adjusted rates, and a short caveat that keeps the claim tied to reported incidents
-and the selected inputs.
+class, exposure-adjusted rates, and a short caveat that keeps the claim tied to reported
+incidents and the selected inputs.
 
 Analytical is the audit view. It shows the supporting counts, exposure, rate ratio,
 confidence interval, p-values, method, overdispersion status, minimum-data status, filters,

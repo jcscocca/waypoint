@@ -50,6 +50,7 @@ def _comparison_row(
         "analysis_end_date": comparison.analysis_end_date,
         "offense_category": comparison.offense_category,
         "offense_subcategory": comparison.offense_subcategory,
+        "nibrs_group": comparison.nibrs_group,
         "incident_count_a": pairwise.incident_count_a,
         "incident_count_b": pairwise.incident_count_b,
         "exposure_a": pairwise.exposure_a,
