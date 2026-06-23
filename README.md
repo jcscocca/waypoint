@@ -176,10 +176,10 @@ GET /routes/requests/{request_id}/comparison
 ```
 
 `POST /routes/alternatives` accepts generalized Seattle origin and destination labels,
-route mode, optional departure details, and optional `analysis_start_date`,
-`analysis_end_date`, and `radii_m` values. When analysis dates are provided, the response
-and persisted comparison include reported incident context summaries near route points
-including segment starts and ends.
+route mode (`transit`, `walk`, `bike`, or `drive`), optional departure details, and optional
+`analysis_start_date`, `analysis_end_date`, and `radii_m` values. When analysis dates are
+provided, the response and persisted comparison include reported incident context summaries
+near route points including segment starts and ends.
 
 Tableau route exports are available at:
 
