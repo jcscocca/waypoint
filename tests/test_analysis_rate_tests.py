@@ -60,6 +60,25 @@ def test_compare_incident_rates_rejects_invalid_counts(count_a, count_b):
         )
 
 
+@pytest.mark.parametrize(
+    ("exposure_a", "exposure_b"),
+    [
+        (math.nan, 30.0),
+        (30.0, math.nan),
+        (math.inf, 30.0),
+        (30.0, math.inf),
+    ],
+)
+def test_compare_incident_rates_rejects_non_finite_exposures(exposure_a, exposure_b):
+    with pytest.raises(ValueError, match="Exposure values must be finite and positive"):
+        compare_incident_rates(
+            count_a=8,
+            exposure_a=exposure_a,
+            count_b=28,
+            exposure_b=exposure_b,
+        )
+
+
 @pytest.mark.parametrize("phi", [-1.0, math.inf, math.nan])
 def test_compare_incident_rates_rejects_invalid_overdispersion_phi(phi):
     with pytest.raises(ValueError, match="Overdispersion phi must be finite and nonnegative"):
@@ -87,8 +106,14 @@ def test_dispersion_status_marks_short_series_as_insufficient_periods():
 
 
 def test_dispersion_status_rejects_negative_period_counts():
-    with pytest.raises(ValueError, match="Period counts must be nonnegative"):
+    with pytest.raises(ValueError, match="Period counts must be nonnegative integers"):
         dispersion_status([1, -1, 2])
+
+
+@pytest.mark.parametrize("period_counts", [[1, 1.5, 2], [1, True, 2]])
+def test_dispersion_status_rejects_non_integer_period_counts(period_counts):
+    with pytest.raises(ValueError, match="Period counts must be nonnegative integers"):
+        dispersion_status(period_counts)
 
 
 def test_quasi_poisson_adjustment_weakens_high_dispersion_significance():

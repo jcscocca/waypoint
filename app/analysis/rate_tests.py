@@ -23,8 +23,10 @@ def compare_incident_rates(
 ) -> RateTestResult:
     if not _is_nonnegative_integer(count_a) or not _is_nonnegative_integer(count_b):
         raise ValueError("Incident counts must be nonnegative integers.")
-    if exposure_a <= 0 or exposure_b <= 0:
-        raise ValueError("Exposure values must be positive.")
+    if not math.isfinite(exposure_a) or exposure_a <= 0:
+        raise ValueError("Exposure values must be finite and positive.")
+    if not math.isfinite(exposure_b) or exposure_b <= 0:
+        raise ValueError("Exposure values must be finite and positive.")
     if overdispersion_phi is not None and (
         not math.isfinite(overdispersion_phi) or overdispersion_phi < 0
     ):
@@ -127,8 +129,8 @@ def _binomial_probability(trials: int, successes: int, probability: float) -> fl
 
 
 def dispersion_status(period_counts: Sequence[int]) -> DispersionResult:
-    if any(count < 0 for count in period_counts):
-        raise ValueError("Period counts must be nonnegative.")
+    if any(not _is_nonnegative_integer(count) for count in period_counts):
+        raise ValueError("Period counts must be nonnegative integers.")
     if len(period_counts) < 2:
         return DispersionResult(phi=None, status="insufficient_periods")
     mean = sum(period_counts) / len(period_counts)
