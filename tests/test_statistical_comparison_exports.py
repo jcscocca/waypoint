@@ -5,44 +5,9 @@ from io import StringIO
 from fastapi.testclient import TestClient
 
 from app.db import get_sessionmaker
+from app.exports.statistical import STATISTICAL_COMPARISON_COLUMNS
 from app.main import create_app
 from app.models import CrimeIncident
-
-STATISTICAL_COMPARISON_EXPORT_COLUMNS = {
-    "comparison_id",
-    "comparison_type",
-    "option_a_id",
-    "option_a_label",
-    "option_b_id",
-    "option_b_label",
-    "winner_option_id",
-    "winner_label",
-    "decision_class",
-    "method",
-    "radius_m",
-    "analysis_start_date",
-    "analysis_end_date",
-    "offense_category",
-    "offense_subcategory",
-    "incident_count_a",
-    "incident_count_b",
-    "exposure_a",
-    "exposure_b",
-    "exposure_unit",
-    "rate_a",
-    "rate_b",
-    "rate_ratio",
-    "ci_lower",
-    "ci_upper",
-    "p_value",
-    "adjusted_p_value",
-    "overdispersion_phi",
-    "overdispersion_status",
-    "minimum_data_status",
-    "overview_summary_text",
-    "caveat_text",
-    "created_at",
-}
 
 
 def test_statistical_comparison_tableau_export_includes_site_pairwise_results(tmp_path):
@@ -114,9 +79,10 @@ def test_statistical_comparison_tableau_export_includes_site_pairwise_results(tm
         export_response.headers["content-disposition"]
         == "attachment; filename=statistical-comparisons.csv"
     )
-    rows = list(csv.DictReader(StringIO(export_response.text)))
+    reader = csv.DictReader(StringIO(export_response.text))
+    assert reader.fieldnames == STATISTICAL_COMPARISON_COLUMNS
+    rows = list(reader)
     assert rows
-    assert rows[0].keys() == STATISTICAL_COMPARISON_EXPORT_COLUMNS
     assert rows[0]["comparison_id"] == comparison_id
     assert rows[0]["decision_class"] in {
         "statistically_lower",

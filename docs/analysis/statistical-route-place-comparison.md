@@ -47,7 +47,7 @@ adjustment so the uncertainty estimate reflects extra variation in the observed 
 ## Multiple Comparisons
 
 When more than two options are compared, the app applies a Benjamini-Hochberg adjustment to
-control the false discovery rate across pairwise comparisons. A route is recommended only
+control the false discovery rate across pairwise comparisons. An option is recommended only
 when it passes the conservative threshold against every relevant alternative.
 
 ## Recommendation Threshold

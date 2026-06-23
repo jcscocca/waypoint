@@ -21,6 +21,8 @@ def tableau_statistical_comparisons_csv(session: Session, user_id_hash: str) -> 
             StatisticalComparison.id,
             StatisticalPairwiseResult.option_a_label,
             StatisticalPairwiseResult.option_b_label,
+            StatisticalPairwiseResult.created_at,
+            StatisticalPairwiseResult.id,
         )
     ).all()
     return build_statistical_comparisons_csv(
