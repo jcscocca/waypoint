@@ -3,6 +3,7 @@ from app.routing.place_resolver import UnknownRoutePlaceError, resolve_route_pla
 
 def test_resolve_route_place_supports_aliases_and_display_coordinates():
     place = resolve_route_place("Capitol Hill")
+    alias_place = resolve_route_place("cap hill")
 
     assert place.label == "Capitol Hill"
     assert place.location_type == "neighborhood"
@@ -10,6 +11,9 @@ def test_resolve_route_place_supports_aliases_and_display_coordinates():
     assert round(place.longitude, 3) == -122.321
     assert place.display_latitude is not None
     assert place.display_longitude is not None
+    assert alias_place.label == "Capitol Hill"
+    assert alias_place.display_latitude == place.display_latitude
+    assert alias_place.display_longitude == place.display_longitude
 
 
 def test_resolve_route_place_rejects_unknown_places():
