@@ -1,0 +1,165 @@
+from datetime import UTC, datetime
+
+from fastapi.testclient import TestClient
+
+from app.db import get_sessionmaker
+from app.main import create_app
+from app.models import CrimeIncident
+
+
+def _client_with_places_and_crime(tmp_path) -> TestClient:
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+    client.post("/sessions")
+    session = get_sessionmaker()()
+    session.add_all(
+        [
+            CrimeIncident(
+                id="incident-a",
+                offense_start_utc=datetime(2024, 1, 10, tzinfo=UTC),
+                offense_category="PROPERTY",
+                latitude=47.609,
+                longitude=-122.333,
+            ),
+            CrimeIncident(
+                id="incident-b",
+                offense_start_utc=datetime(2024, 1, 11, tzinfo=UTC),
+                offense_category="PROPERTY",
+                latitude=47.621,
+                longitude=-122.321,
+            ),
+        ]
+    )
+    session.commit()
+    session.close()
+    for label, lat, lon, visits in [
+        ("Downtown transfer stop", 47.609, -122.333, 12),
+        ("Library area", 47.621, -122.321, 6),
+    ]:
+        response = client.post(
+            "/places",
+            json={
+                "display_label": label,
+                "latitude": lat,
+                "longitude": lon,
+                "visit_count": visits,
+            },
+        )
+        assert response.status_code == 201
+    return client
+
+
+def test_dashboard_analyze_selected_places(tmp_path):
+    client = _client_with_places_and_crime(tmp_path)
+    places = client.get("/places").json()["places"]
+    selected_ids = [place["id"] for place in places]
+
+    response = client.post(
+        "/dashboard/analyze",
+        json={
+            "place_ids": selected_ids,
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "radii_m": [250],
+            "offense_category": "PROPERTY",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["summary_count"] == 2
+    dashboard = client.get("/dashboard/summary").json()
+    assert dashboard["totals"]["incident_count"] == 2
+
+
+def test_dashboard_compare_selected_places(tmp_path):
+    client = _client_with_places_and_crime(tmp_path)
+    places = client.get("/places").json()["places"]
+
+    response = client.post(
+        "/dashboard/compare",
+        json={
+            "place_ids": [place["id"] for place in places],
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "radius_m": 250,
+            "offense_category": "PROPERTY",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["overview"]["label"] == "Overview"
+    assert len(response.json()["overview"]["options"]) == 2
+
+
+def test_dashboard_analysis_actions_require_public_session_cookie(tmp_path):
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+
+    for endpoint, payload in [
+        (
+            "/dashboard/analyze",
+            {
+                "place_ids": ["selected-place"],
+                "analysis_start_date": "2024-01-01",
+                "analysis_end_date": "2024-01-31",
+                "radii_m": [250],
+            },
+        ),
+        (
+            "/dashboard/compare",
+            {
+                "place_ids": ["selected-place", "other-place"],
+                "analysis_start_date": "2024-01-01",
+                "analysis_end_date": "2024-01-31",
+                "radius_m": 250,
+            },
+        ),
+    ]:
+        response = client.post(
+            endpoint,
+            json=payload,
+            headers={"X-Demo-User-ID": "demo@example.com"},
+        )
+
+        assert response.status_code == 401
+
+
+def test_dashboard_analyze_rejects_cross_session_place_ids(tmp_path):
+    first = _client_with_places_and_crime(tmp_path)
+    selected_ids = [place["id"] for place in first.get("/places").json()["places"]]
+    second = TestClient(first.app)
+    second.post("/sessions")
+
+    response = second.post(
+        "/dashboard/analyze",
+        json={
+            "place_ids": selected_ids,
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "radii_m": [250],
+            "offense_category": "PROPERTY",
+        },
+    )
+
+    assert response.status_code in {400, 404}
+    assert second.get("/dashboard/summary").json()["totals"]["incident_count"] == 0
+
+
+def test_dashboard_compare_rejects_cross_session_place_ids(tmp_path):
+    first = _client_with_places_and_crime(tmp_path)
+    selected_ids = [place["id"] for place in first.get("/places").json()["places"]]
+    second = TestClient(first.app)
+    second.post("/sessions")
+
+    response = second.post(
+        "/dashboard/compare",
+        json={
+            "place_ids": selected_ids,
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "radius_m": 250,
+            "offense_category": "PROPERTY",
+        },
+    )
+
+    assert response.status_code in {400, 404}
