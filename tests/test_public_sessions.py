@@ -1,8 +1,10 @@
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.api.deps import required_public_user_hash
+from app.config import DEFAULT_SESSION_SECRET, DEFAULT_USER_HASH_SALT, Settings
 from app.db import get_sessionmaker
 from app.main import create_app
 from app.models import PlaceCluster
@@ -35,6 +37,8 @@ def test_public_session_cookie_can_be_marked_secure(tmp_path, monkeypatch):
 def test_public_session_cookie_defaults_secure_in_production(tmp_path, monkeypatch):
     monkeypatch.delenv("MCA_SESSION_COOKIE_SECURE", raising=False)
     monkeypatch.setenv("MCA_ENVIRONMENT", "production")
+    monkeypatch.setenv("MCA_USER_HASH_SALT", "test-production-salt")
+    monkeypatch.setenv("MCA_SESSION_SECRET", "test-production-session-secret")
     app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
     client = TestClient(app)
 
@@ -42,6 +46,15 @@ def test_public_session_cookie_defaults_secure_in_production(tmp_path, monkeypat
 
     assert response.status_code == 200
     assert "Secure" in response.headers["set-cookie"]
+
+
+def test_production_settings_reject_default_secret_material():
+    with pytest.raises(ValidationError, match="Production deployments must override"):
+        Settings(
+            environment="production",
+            user_hash_salt=DEFAULT_USER_HASH_SALT,
+            session_secret=DEFAULT_SESSION_SECRET,
+        )
 
 
 def test_public_read_routes_reject_demo_header_without_session(tmp_path):
@@ -53,6 +66,10 @@ def test_public_read_routes_reject_demo_header_without_session(tmp_path):
         "/places",
         "/dashboard/summary",
         "/exports/tableau/place-summary.csv",
+        "/exports/tableau/route-alternatives.csv",
+        "/exports/tableau/route-segments.csv",
+        "/exports/tableau/route-context.csv",
+        "/exports/tableau/statistical-comparisons.csv",
     ):
         response = client.get(path, headers=headers)
 

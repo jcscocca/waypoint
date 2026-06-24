@@ -8,8 +8,13 @@ vi.mock("react-leaflet", () => ({
     <div data-testid="map" className={className}>{children}</div>
   ),
   TileLayer: ({ url }: any) => <div data-testid="tile" data-url={url} />,
-  Marker: ({ position, eventHandlers }: any) => (
-    <button data-testid="marker" data-pos={(position as number[]).join(",")} onClick={eventHandlers?.click} />
+  Marker: ({ position, eventHandlers, icon }: any) => (
+    <button
+      data-testid="marker"
+      data-pos={(position as number[]).join(",")}
+      data-icon-html={icon?.options?.html ?? ""}
+      onClick={eventHandlers?.click}
+    />
   ),
   Circle: ({ radius }: any) => <div data-testid="ring" data-radius={radius} />,
   useMap: () => ({ flyTo: vi.fn(), getZoom: () => 12 }),
@@ -86,6 +91,23 @@ describe("MapCanvas", () => {
         radiusM={250} flyTo={null} tileConfig={defaultTileConfig} onMapClick={noop} onMarkerClick={noop} />,
     );
     expect(screen.getByTestId("ring")).toHaveAttribute("data-radius", "250");
+  });
+
+  it("escapes selected place labels before injecting marker HTML", () => {
+    const maliciousPlace = {
+      ...place,
+      display_label: '<img src=x onerror="alert(1)">',
+    };
+
+    render(
+      <MapCanvas places={[maliciousPlace]} selectedIds={new Set(["p1"])} draft={null} addPinMode={false} summary={null}
+        radiusM={250} flyTo={null} tileConfig={defaultTileConfig} onMapClick={noop} onMarkerClick={noop} />,
+    );
+
+    const iconHtml = screen.getByTestId("marker").getAttribute("data-icon-html");
+    expect(iconHtml).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    expect(iconHtml).not.toContain("<img");
+    expect(iconHtml).not.toContain("onerror=\"alert(1)\"");
   });
 
   it("renders a draft marker in addition to place markers", () => {

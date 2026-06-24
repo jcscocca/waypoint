@@ -44,7 +44,7 @@ def _place_summary_response(session: Session, user_id_hash: str) -> Response:
 
 @router.get("/exports/tableau/route-alternatives.csv")
 def export_route_alternatives(
-    user_id_hash: Annotated[str, Depends(current_user_hash)],
+    user_id_hash: Annotated[str, Depends(required_public_user_hash)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Response:
     return Response(
@@ -56,7 +56,7 @@ def export_route_alternatives(
 
 @router.get("/exports/tableau/route-segments.csv")
 def export_route_segments(
-    user_id_hash: Annotated[str, Depends(current_user_hash)],
+    user_id_hash: Annotated[str, Depends(required_public_user_hash)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Response:
     return Response(
@@ -68,7 +68,7 @@ def export_route_segments(
 
 @router.get("/exports/tableau/route-context.csv")
 def export_route_context(
-    user_id_hash: Annotated[str, Depends(current_user_hash)],
+    user_id_hash: Annotated[str, Depends(required_public_user_hash)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Response:
     return Response(
@@ -80,7 +80,7 @@ def export_route_context(
 
 @router.get("/exports/tableau/statistical-comparisons.csv")
 def export_statistical_comparisons(
-    user_id_hash: Annotated[str, Depends(current_user_hash)],
+    user_id_hash: Annotated[str, Depends(required_public_user_hash)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Response:
     return Response(
