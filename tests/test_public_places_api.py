@@ -198,6 +198,49 @@ def test_bulk_place_entry_reports_invalid_rows(tmp_path):
     assert response.json()["skipped_count"] == 1
 
 
+def test_bulk_place_entry_defaults_blank_display_labels(tmp_path):
+    client = _client(tmp_path)
+
+    response = client.post(
+        "/places/bulk",
+        json={
+            "csv_text": (
+                "display_label,latitude,longitude,visit_count\n"
+                ",47.609,-122.333,3\n"
+                "   ,47.621,-122.321,4\n"
+            )
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["created_count"] == 2
+    assert response.json()["skipped_count"] == 0
+    assert [place["display_label"] for place in response.json()["places"]] == [
+        "Entered place",
+        "Entered place",
+    ]
+
+
+def test_bulk_place_entry_clamps_nonpositive_visit_counts(tmp_path):
+    client = _client(tmp_path)
+
+    response = client.post(
+        "/places/bulk",
+        json={
+            "csv_text": (
+                "display_label,latitude,longitude,visit_count\n"
+                "Zero visits,47.609,-122.333,0\n"
+                "Negative visits,47.621,-122.321,-4\n"
+            )
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["created_count"] == 2
+    assert response.json()["skipped_count"] == 0
+    assert [place["visit_count"] for place in response.json()["places"]] == [1, 1]
+
+
 def test_bulk_place_entry_requires_session_cookie(tmp_path):
     app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
     client = TestClient(app)

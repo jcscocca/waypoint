@@ -116,11 +116,13 @@ def create_bulk_manual_places(
                 skipped_count += 1
                 continue
 
+            display_label = (row.get("display_label") or "").strip() or "Entered place"
+            visit_count = max(1, int(float(row.get("visit_count") or 1)))
             payload = ManualPlaceCreate(
-                display_label=row.get("display_label") or "",
+                display_label=display_label,
                 latitude=latitude,
                 longitude=longitude,
-                visit_count=int(float(row.get("visit_count") or 1)),
+                visit_count=visit_count,
                 total_dwell_minutes=_optional_float(row.get("total_dwell_minutes")),
                 median_dwell_minutes=_optional_float(row.get("median_dwell_minutes")),
                 typical_days=_empty_to_none(row.get("typical_days")),
