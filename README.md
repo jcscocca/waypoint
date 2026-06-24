@@ -155,6 +155,17 @@ Dashboard-ready summary data is available from:
 GET /dashboard/summary
 ```
 
+## Public Launch Checklist
+
+- Run `make test` and `make lint`.
+- Run `cd frontend && npm test && npm run build`.
+- Run `docker build .`.
+- Set `MCA_DATABASE_URL`, `MCA_USER_HASH_SALT`, `MCA_SESSION_SECRET`, and `MCA_ADMIN_INGEST_TOKEN`.
+- Run Alembic migrations before serving traffic.
+- Ingest recent Seattle SPD data through the admin Socrata endpoint.
+- Confirm the public dashboard does not show personal timeline upload as an entry mode.
+- Confirm the dashboard copy describes reported incident context, not personal safety.
+
 ## Internal Upload Demo Flow
 
 Personal timeline uploads are available for internal demos and parser validation. Enable the
