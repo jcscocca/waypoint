@@ -190,6 +190,52 @@ def test_admin_socrata_ingest_rejects_negative_offset_without_fetching(
     assert response.status_code == 422
 
 
+def test_admin_socrata_ingest_rejects_huge_offset_without_fetching(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("MCA_ADMIN_INGEST_TOKEN", "secret-token")
+
+    def fail_fetch_page(self, limit: int, offset: int) -> list[CrimeIncidentData]:
+        raise AssertionError("fetch_page should not be called for invalid pagination")
+
+    monkeypatch.setattr(
+        "app.api.routes_admin_crime.SeattleSocrataClient.fetch_page",
+        fail_fetch_page,
+    )
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+
+    response = client.post(
+        "/admin/crime/ingest/socrata?limit=25&offset=1000001",
+        headers={"X-Admin-Token": "secret-token"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_admin_socrata_ingest_checks_token_before_pagination(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("MCA_ADMIN_INGEST_TOKEN", "secret-token")
+
+    def fail_fetch_page(self, limit: int, offset: int) -> list[CrimeIncidentData]:
+        raise AssertionError("fetch_page should not be called without admin token")
+
+    monkeypatch.setattr(
+        "app.api.routes_admin_crime.SeattleSocrataClient.fetch_page",
+        fail_fetch_page,
+    )
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+
+    response = client.post("/admin/crime/ingest/socrata?limit=-1&offset=1000001")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin token required"
+
+
 def test_admin_socrata_ingest_fetches_page_and_returns_ingestion_result(
     tmp_path,
     monkeypatch,
