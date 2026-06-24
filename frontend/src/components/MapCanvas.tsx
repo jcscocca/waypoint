@@ -12,14 +12,26 @@ type MarkerKind = "default" | "selected" | "analyzed" | "low";
 
 const DOT = '<circle cx="12" cy="11.5" r="4.4" fill="#fff"/>';
 const QGLYPH = '<text x="12" y="16" font-size="13" fill="#fff" text-anchor="middle" font-family="Archivo" font-weight="700">?</text>';
+const HTML_ENTITIES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
 
 function teardrop(fill: string, glyph: string): string {
   return `<svg width="28" height="36" viewBox="0 0 24 32"><path d="M12 0C5.4 0 0 5.2 0 11.6 0 20 12 32 12 32s12-12 12-20.4C24 5.2 18.6 0 12 0z" fill="${fill}"/>${glyph}</svg>`;
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => HTML_ENTITIES[char]);
+}
+
 function iconHtml(kind: MarkerKind, opts: { count?: number | null; label?: string }): string {
   if (kind === "selected") {
-    return `<span class="mc-pin-halo"></span>${teardrop("#CD6A45", DOT)}<span class="mc-pin-tag">${opts.label ?? ""}</span>`;
+    const label = opts.label ? escapeHtml(opts.label) : "";
+    return `<span class="mc-pin-halo"></span>${teardrop("#CD6A45", DOT)}<span class="mc-pin-tag">${label}</span>`;
   }
   if (kind === "analyzed") {
     return `${teardrop("#3A3F46", DOT)}<span class="mc-pin-badge"><b>${opts.count ?? 0}</b><i>inc.</i></span>`;

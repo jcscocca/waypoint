@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from app.db import get_sessionmaker
 from app.main import create_app
 from app.models import CrimeIncident, PlaceCluster
+from app.sessions import public_user_hash
 
 
 def _client_with_places_and_crime(tmp_path) -> TestClient:
@@ -69,6 +70,82 @@ def test_dashboard_analyze_selected_places(tmp_path):
     assert response.json()["summary_count"] == 2
     dashboard = client.get("/dashboard/summary").json()
     assert dashboard["totals"]["incident_count"] == 2
+
+
+def test_dashboard_analyze_filters_candidates_before_summarizing(tmp_path):
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+    client.post("/sessions")
+    user_hash = public_user_hash(client.cookies.get("mca_session"))
+    assert user_hash is not None
+    session = get_sessionmaker()()
+    session.add(
+        PlaceCluster(
+            id="selected-place",
+            user_id_hash=user_hash,
+            cluster_version="test",
+            cluster_method="manual",
+            centroid_latitude=47.5900,
+            centroid_longitude=-122.2900,
+            display_latitude=47.6100,
+            display_longitude=-122.3330,
+            visit_count=3,
+            inferred_place_type="manual_place",
+            sensitivity_class="normal",
+            display_label="Display-safe place",
+            label_source="test",
+        )
+    )
+    session.add_all(
+        [
+            CrimeIncident(
+                id="matching-incident",
+                offense_start_utc=datetime(2024, 1, 10, tzinfo=UTC),
+                offense_category="PROPERTY",
+                latitude=47.6101,
+                longitude=-122.3330,
+            ),
+            CrimeIncident(
+                id="outside-date",
+                offense_start_utc=datetime(2023, 12, 31, tzinfo=UTC),
+                offense_category="PROPERTY",
+                latitude=47.6101,
+                longitude=-122.3330,
+            ),
+            CrimeIncident(
+                id="outside-category",
+                offense_start_utc=datetime(2024, 1, 10, tzinfo=UTC),
+                offense_category="PERSON",
+                latitude=47.6101,
+                longitude=-122.3330,
+            ),
+            CrimeIncident(
+                id="outside-bbox",
+                offense_start_utc=datetime(2024, 1, 10, tzinfo=UTC),
+                offense_category="PROPERTY",
+                latitude=47.7000,
+                longitude=-122.4500,
+            ),
+        ]
+    )
+    session.commit()
+    session.close()
+
+    response = client.post(
+        "/dashboard/analyze",
+        json={
+            "place_ids": ["selected-place"],
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "radii_m": [250],
+            "offense_category": "PROPERTY",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["summary_count"] == 1
+    dashboard = client.get("/dashboard/summary").json()
+    assert dashboard["totals"]["incident_count"] == 1
 
 
 def test_dashboard_analyze_rejects_duplicate_radii(tmp_path):
