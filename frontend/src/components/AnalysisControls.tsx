@@ -92,6 +92,7 @@ export function AnalysisControls({
               name="analysis-start-date"
               type="date"
               value={startDate}
+              required
               onChange={(event) => setStartDate(event.target.value)}
             />
           </div>
@@ -102,6 +103,7 @@ export function AnalysisControls({
               name="analysis-end-date"
               type="date"
               value={endDate}
+              required
               onChange={(event) => setEndDate(event.target.value)}
             />
           </div>

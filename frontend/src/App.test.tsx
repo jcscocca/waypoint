@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -39,6 +40,15 @@ const libraryPlace: Place = {
   inferred_place_type: "manual_place",
   sensitivity_class: "normal",
 };
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
 
 function makeSummary(places: Place[] = []): DashboardSummary {
   return {
@@ -288,5 +298,41 @@ describe("App", () => {
       "href",
       "/exports/current.csv",
     );
+  });
+
+  it("ignores a stale comparison response after selection changes", async () => {
+    const cafePlace: Place = {
+      ...libraryPlace,
+      id: "p2",
+      display_label: "Cafe",
+      visit_count: 3,
+    };
+    const comparison = createDeferred<Record<string, unknown>>();
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([libraryPlace, cafePlace]));
+    vi.mocked(comparePlaces).mockReturnValue(comparison.promise);
+
+    render(<App />);
+
+    await screen.findByText("Library");
+    fireEvent.click(screen.getByLabelText("Select Library"));
+    fireEvent.click(screen.getByLabelText("Select Cafe"));
+    fireEvent.click(screen.getByRole("button", { name: /compare places/i }));
+
+    fireEvent.click(screen.getByLabelText("Select Cafe"));
+
+    await act(async () => {
+      comparison.resolve({
+        overview: {
+          summary_text: "This stale result should not render.",
+          caveat_text: "Selection changed before the comparison resolved.",
+        },
+      });
+      await comparison.promise;
+    });
+
+    expect(
+      screen.queryByText("This stale result should not render."),
+    ).not.toBeInTheDocument();
   });
 });

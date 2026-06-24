@@ -1,5 +1,5 @@
 import { ShieldAlert } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   analyzePlaces,
@@ -24,6 +24,7 @@ export default function App() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [comparison, setComparison] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
+  const comparisonVersionRef = useRef(0);
 
   const refresh = async () => {
     const nextSummary = await getDashboardSummary();
@@ -77,6 +78,8 @@ export default function App() {
 
   const handleDelete = async (placeId: string) => {
     setError("");
+    comparisonVersionRef.current += 1;
+    setComparison(null);
     try {
       await deletePlace(placeId);
       setSelectedIds((current) => {
@@ -84,7 +87,6 @@ export default function App() {
         next.delete(placeId);
         return next;
       });
-      setComparison(null);
       await refreshWithFallback("Removed place, but dashboard totals could not refresh.");
     } catch {
       setError("Unable to remove place. Try again.");
@@ -92,6 +94,7 @@ export default function App() {
   };
 
   const handleToggle = (placeId: string) => {
+    comparisonVersionRef.current += 1;
     setComparison(null);
     setSelectedIds((current) => {
       const next = new Set(current);
@@ -126,14 +129,20 @@ export default function App() {
     offense_category: string | null;
   }) {
     setError("");
+    const comparisonVersion = comparisonVersionRef.current + 1;
+    comparisonVersionRef.current = comparisonVersion;
     try {
       const result = await comparePlaces({
         ...request,
         place_ids: Array.from(selectedIds),
       });
-      setComparison(result);
+      if (comparisonVersionRef.current === comparisonVersion) {
+        setComparison(result);
+      }
     } catch {
-      setError("Unable to compare places. Try again.");
+      if (comparisonVersionRef.current === comparisonVersion) {
+        setError("Unable to compare places. Try again.");
+      }
     }
   }
 
