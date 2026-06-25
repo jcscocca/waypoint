@@ -74,6 +74,14 @@ Waypoint reads that gateway from `MCA_LOCALAGENT_BASE_URL`, which defaults to
 `http://127.0.0.1:8010` so it does not collide with the Waypoint API on port
 `8000`.
 
+If port `8000` is already occupied, start Waypoint on another port and point
+Vite at it:
+
+```bash
+MCA_LOCALAGENT_BASE_URL=http://127.0.0.1:8010 .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+cd frontend && VITE_BACKEND_TARGET=http://127.0.0.1:8001 npm run dev
+```
+
 Run with Postgres/PostGIS:
 
 ```bash
