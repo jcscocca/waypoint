@@ -41,11 +41,11 @@ describe("BottomSheet", () => {
     fireEvent.keyDown(screen.getByRole("tab", { name: /analyze/i }), { key: "Enter" });
     expect(onTabChange).toHaveBeenCalledWith("analyze");
 
-    fireEvent.keyDown(screen.getByRole("button", { name: /full/i }), { key: " " });
-    expect(onSheetStateChange).toHaveBeenCalledWith("full");
+    fireEvent.keyDown(screen.getByRole("button", { name: /peek/i }), { key: " " });
+    expect(onSheetStateChange).toHaveBeenCalledWith("peek");
   });
 
-  it("exposes snap controls and reflects the state class", () => {
+  it("exposes only launch-ready snap controls and reflects the state class", () => {
     const onSheetStateChange = vi.fn();
     const { container } = render(
       <BottomSheet activeTab="places" onTabChange={vi.fn()} sheetState="half" onSheetStateChange={onSheetStateChange}>
@@ -53,7 +53,22 @@ describe("BottomSheet", () => {
       </BottomSheet>,
     );
     expect(container.querySelector(".mc-sheet")).toHaveClass("is-half");
-    fireEvent.click(screen.getByRole("button", { name: /full/i }));
-    expect(onSheetStateChange).toHaveBeenCalledWith("full");
+    expect(screen.queryByRole("button", { name: /full/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /peek/i }));
+    expect(onSheetStateChange).toHaveBeenCalledWith("peek");
+  });
+
+  it("cycles the handle between peek and half states", () => {
+    const onSheetStateChange = vi.fn();
+    render(
+      <BottomSheet activeTab="places" onTabChange={vi.fn()} sheetState="half" onSheetStateChange={onSheetStateChange}>
+        <div>panel</div>
+      </BottomSheet>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cycle panel height" }));
+
+    expect(onSheetStateChange).toHaveBeenCalledWith("peek");
   });
 });
