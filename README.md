@@ -72,9 +72,13 @@ Load a recent window of real Seattle SPD public incident data into the local
 Compose database:
 
 ```bash
+CURRENT_YEAR="$(date +%Y)"
+ANALYSIS_START_DATE="${CURRENT_YEAR}-01-01"
+ANALYSIS_END_DATE="$(date +%F)"
+
 curl --fail --show-error -X POST \
   -H "X-Admin-Token: local-admin-token" \
-  "http://127.0.0.1:8000/admin/crime/ingest/socrata?limit=5000&offset=0&start_date=2026-04-01&end_date=2026-06-22"
+  "http://127.0.0.1:8000/admin/crime/ingest/socrata?limit=5000&offset=0&start_date=${ANALYSIS_START_DATE}&end_date=${ANALYSIS_END_DATE}"
 ```
 
 Apply migrations manually:
@@ -118,21 +122,31 @@ curl -b demo.cookies -H "Content-Type: application/json" \
   http://127.0.0.1:8000/places/bulk
 ```
 
-Load sample crime data, then analyze selected saved places:
+After loading live crime data, analyze selected saved places with the current-year
+window:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/crime/ingest/sample
+CURRENT_YEAR="$(date +%Y)"
+ANALYSIS_START_DATE="${CURRENT_YEAR}-01-01"
+ANALYSIS_END_DATE="$(date +%F)"
+
 curl -b demo.cookies -H "Content-Type: application/json" \
-  -d '{"place_ids":["<place_id>"],"analysis_start_date":"2024-01-01","analysis_end_date":"2024-01-31","radii_m":[250,500]}' \
-  http://127.0.0.1:8000/dashboard/analyze
+  -d @- http://127.0.0.1:8000/dashboard/analyze <<JSON
+{"place_ids":["<place_id>"],"analysis_start_date":"${ANALYSIS_START_DATE}","analysis_end_date":"${ANALYSIS_END_DATE}","radii_m":[250,500]}
+JSON
 ```
 
 Compare two or more saved places:
 
 ```bash
+CURRENT_YEAR="$(date +%Y)"
+ANALYSIS_START_DATE="${CURRENT_YEAR}-01-01"
+ANALYSIS_END_DATE="$(date +%F)"
+
 curl -b demo.cookies -H "Content-Type: application/json" \
-  -d '{"place_ids":["<first_place_id>","<second_place_id>"],"analysis_start_date":"2024-01-01","analysis_end_date":"2024-01-31","radius_m":500}' \
-  http://127.0.0.1:8000/dashboard/compare
+  -d @- http://127.0.0.1:8000/dashboard/compare <<JSON
+{"place_ids":["<first_place_id>","<second_place_id>"],"analysis_start_date":"${ANALYSIS_START_DATE}","analysis_end_date":"${ANALYSIS_END_DATE}","radius_m":500}
+JSON
 ```
 
 Export Tableau CSV:
@@ -199,14 +213,18 @@ curl -X POST -H "X-Demo-User-Id: demo@example.com" \
   http://127.0.0.1:8000/imports/<import_id>/normalize
 ```
 
-Load sample crime data and summarize:
+Summarize against live crime data with the current-year window:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/crime/ingest/sample
+CURRENT_YEAR="$(date +%Y)"
+ANALYSIS_START_DATE="${CURRENT_YEAR}-01-01"
+ANALYSIS_END_DATE="$(date +%F)"
+
 curl -X POST -H "Content-Type: application/json" \
   -H "X-Demo-User-Id: demo@example.com" \
-  -d '{"analysis_start_date":"2024-01-01","analysis_end_date":"2024-01-31","radii_m":[250]}' \
-  http://127.0.0.1:8000/crime/summarize
+  -d @- http://127.0.0.1:8000/crime/summarize <<JSON
+{"analysis_start_date":"${ANALYSIS_START_DATE}","analysis_end_date":"${ANALYSIS_END_DATE}","radii_m":[250]}
+JSON
 ```
 
 Export Tableau CSV:

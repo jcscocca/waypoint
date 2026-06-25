@@ -18,6 +18,7 @@ import {
   deletePlace,
   getDashboardSummary,
 } from "./api/client";
+import { currentYearAnalysisWindow } from "./lib/analysisDefaults";
 import type { DashboardSummary, Place } from "./types";
 
 vi.mock("./api/client", () => ({
@@ -235,6 +236,7 @@ describe("App", () => {
   });
 
   it("runs analysis for selected places and refreshes dashboard totals", async () => {
+    const expectedAnalysisWindow = currentYearAnalysisWindow();
     vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
     vi.mocked(getDashboardSummary)
       .mockResolvedValueOnce(makeSummary([libraryPlace]))
@@ -255,8 +257,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(analyzePlaces).toHaveBeenCalledWith({
         place_ids: ["p1"],
-        analysis_start_date: "2024-01-01",
-        analysis_end_date: "2024-01-31",
+        ...expectedAnalysisWindow,
         radii_m: [250],
         offense_category: "PROPERTY",
       });
@@ -266,6 +267,7 @@ describe("App", () => {
   });
 
   it("compares selected places and exposes the summary export link", async () => {
+    const expectedAnalysisWindow = currentYearAnalysisWindow();
     const cafePlace: Place = {
       ...libraryPlace,
       id: "p2",
@@ -293,8 +295,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(comparePlaces).toHaveBeenCalledWith({
         place_ids: ["p1", "p2"],
-        analysis_start_date: "2024-01-01",
-        analysis_end_date: "2024-01-31",
+        ...expectedAnalysisWindow,
         radius_m: 250,
         offense_category: "PROPERTY",
       });

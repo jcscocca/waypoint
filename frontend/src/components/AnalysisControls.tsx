@@ -1,6 +1,8 @@
 import { BarChart3 } from "lucide-react";
 import { FormEvent, useState } from "react";
 
+import { currentYearAnalysisWindow } from "../lib/analysisDefaults";
+
 type AnalyzeRequest = {
   analysis_start_date: string;
   analysis_end_date: string;
@@ -26,8 +28,9 @@ export function AnalysisControls({
   onAnalyze,
   onCompare,
 }: Props) {
-  const [startDate, setStartDate] = useState("2024-01-01");
-  const [endDate, setEndDate] = useState("2024-01-31");
+  const [analysisWindow] = useState(() => currentYearAnalysisWindow());
+  const [startDate, setStartDate] = useState(analysisWindow.analysis_start_date);
+  const [endDate, setEndDate] = useState(analysisWindow.analysis_end_date);
   const [radius, setRadius] = useState("250");
   const [offenseCategory, setOffenseCategory] = useState("PROPERTY");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
