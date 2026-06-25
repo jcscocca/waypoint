@@ -53,7 +53,7 @@ const TABS: { key: TabKey; label: string; icon: ReactNode }[] = [
   },
 ];
 
-const SNAPS: SheetState[] = ["full", "half", "peek"];
+const SNAPS: SheetState[] = ["half", "peek"];
 
 function activateWithKeyboard(event: KeyboardEvent<HTMLButtonElement>, action: () => void) {
   if (event.key === "Enter" || event.key === " ") {
@@ -71,7 +71,7 @@ export function BottomSheet({
   children,
 }: Props) {
   function cycle() {
-    const order: SheetState[] = ["peek", "half", "full"];
+    const order: SheetState[] = ["peek", "half"];
     onSheetStateChange(order[(order.indexOf(sheetState) + 1) % order.length]);
   }
 
