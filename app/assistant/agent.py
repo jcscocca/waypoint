@@ -151,13 +151,65 @@ def _tool_arguments(
 
 
 def _parse_model_json(raw: str) -> dict[str, Any]:
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise ValueError("The local model returned an invalid assistant plan.") from exc
-    if not isinstance(parsed, dict):
-        raise ValueError("The local model returned an invalid assistant plan.")
-    return parsed
+    for candidate in _json_candidates(raw.strip()):
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    raise ValueError("The local model returned an invalid assistant plan.")
+
+
+def _json_candidates(text: str) -> list[str]:
+    candidates = [text]
+    fenced = _strip_code_fence(text)
+    if fenced != text:
+        candidates.append(fenced)
+    extracted = _extract_first_json_object(fenced)
+    if extracted is not None and extracted not in candidates:
+        candidates.append(extracted)
+    return candidates
+
+
+def _strip_code_fence(text: str) -> str:
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return text
+    lines = stripped.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip().startswith("```"):
+        lines = lines[:-1]
+    return "\n".join(lines)
+
+
+def _extract_first_json_object(text: str) -> str | None:
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+    return None
 
 
 def _final_message(plan: dict[str, Any]) -> str:
