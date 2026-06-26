@@ -69,6 +69,18 @@ is created automatically on first load.
   calls them, so this is not a tester-to-tester leak, but lock them down (roadmap WS5)
   before any public exposure.
 
+### Assistant
+
+The AI panel (chat assistant) calls a local model gateway on the **host** machine.
+Inside the container the host is reachable as `host.docker.internal` (added
+automatically via `extra_hosts` in `docker-compose.yml`).
+
+Set `MCA_LOCALAGENT_BASE_URL=http://host.docker.internal:8010` in `.env.deploy`
+(the example already includes this line) to point the container at the host's running
+LocalAgent/model stack. If that stack is not running, the assistant returns an error
+message but every other part of the app — maps, analysis, neighborhood, compare,
+exports — is completely unaffected.
+
 ## Stop / reset
 
 ```bash

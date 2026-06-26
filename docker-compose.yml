@@ -27,6 +27,9 @@ services:
       MCA_SESSION_COOKIE_SECURE: "${MCA_SESSION_COOKIE_SECURE:-false}"
       MCA_PUBLIC_ENABLE_PERSONAL_UPLOADS: "${MCA_PUBLIC_ENABLE_PERSONAL_UPLOADS:-false}"
       MCA_ADMIN_INGEST_TOKEN: ${MCA_ADMIN_INGEST_TOKEN:-local-admin-token}
+      MCA_LOCALAGENT_BASE_URL: ${MCA_LOCALAGENT_BASE_URL:-http://127.0.0.1:8010}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     depends_on:

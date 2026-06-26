@@ -280,6 +280,34 @@ def test_agent_tolerates_non_dict_tool_arguments(tmp_path):
     assert events[1].data["arguments"]["radii_m"] == [250]
 
 
+def test_agent_accepts_fenced_json_plan(tmp_path):
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    client = FakeClient(['```json\n{"type":"final","message":"One saved place."}\n```'])
+    try:
+        events = asyncio.run(_collect(session, user_hash,
+            [AssistantChatMessage(role="user", content="What do you see?")],
+            AssistantDashboardState(selected_place_ids=["place-1"]), client))
+    finally:
+        session.close()
+    assert [e.event for e in events] == ["meta", "token", "done"]
+    assert events[1].data["delta"] == "One saved place."
+
+
+def test_agent_accepts_prose_wrapped_json_plan(tmp_path):
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    client = FakeClient([
+        'Here is the plan:\n{"type":"final","message":"Use reported incident context."}'
+    ])
+    try:
+        events = asyncio.run(_collect(session, user_hash,
+            [AssistantChatMessage(role="user", content="Summarize.")],
+            AssistantDashboardState(selected_place_ids=["place-1"]), client))
+    finally:
+        session.close()
+    assert [e.event for e in events] == ["meta", "token", "done"]
+    assert events[1].data["delta"] == "Use reported incident context."
+
+
 def test_agent_dedupes_duplicate_radii_when_backfilling(tmp_path):
     # AssistantDashboardState permits duplicate radii, but the tool request schema requires
     # them unique. Backfilling raw duplicates would fail validation and error the whole turn,
