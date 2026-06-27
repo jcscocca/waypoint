@@ -23,7 +23,9 @@ def _route_body(origin: str, destination: str) -> dict:
 def test_public_route_alternatives_returns_ranked_comparison(tmp_path):
     client = _client(tmp_path)
     client.post("/sessions")
-    response = client.post("/routes/alternatives", json=_route_body("Capitol Hill", "Downtown Seattle"))
+    response = client.post(
+        "/routes/alternatives", json=_route_body("Capitol Hill", "Downtown Seattle")
+    )
     assert response.status_code == 200
     body = response.json()
     assert len(body["alternatives"]) >= 2
@@ -34,14 +36,18 @@ def test_public_route_alternatives_returns_ranked_comparison(tmp_path):
 
 def test_public_route_alternatives_requires_session(tmp_path):
     client = _client(tmp_path)
-    response = client.post("/routes/alternatives", json=_route_body("Capitol Hill", "Downtown Seattle"))
+    response = client.post(
+        "/routes/alternatives", json=_route_body("Capitol Hill", "Downtown Seattle")
+    )
     assert response.status_code == 401
 
 
 def test_public_route_single_alternative_has_no_comparison(tmp_path):
     client = _client(tmp_path)
     client.post("/sessions")
-    response = client.post("/routes/alternatives", json=_route_body("Capitol Hill", "University District"))
+    response = client.post(
+        "/routes/alternatives", json=_route_body("Capitol Hill", "University District")
+    )
     assert response.status_code == 200
     body = response.json()
     assert len(body["alternatives"]) == 1
