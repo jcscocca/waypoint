@@ -180,9 +180,20 @@ export function MapWorkspace() {
       });
     }
     // Set result slices AFTER selection (we did NOT call invalidateAnalysisContext, so they stick).
-    if (effect.comparison !== undefined) setComparison(effect.comparison);
-    if (effect.neighborhood !== undefined) setNeighborhood(effect.neighborhood);
-    if (effect.incidents !== undefined) setIncidentDetails(effect.incidents);
+    // The incoming tool result is the source of truth for the panes it drives, so clear the slices
+    // it does NOT own — otherwise a prior manual Analyze/Compare leaves stale data for the new selection.
+    if (effect.comparison !== undefined) {
+      // compare_places owns the comparison; any prior analyze slices are now stale.
+      setNeighborhood(null);
+      setIncidentDetails(null);
+      setComparison(effect.comparison);
+    }
+    if (effect.neighborhood !== undefined || effect.incidents !== undefined) {
+      // analyze_places owns neighborhood + incidents; any prior comparison is now stale.
+      setComparison(null);
+      if (effect.neighborhood !== undefined) setNeighborhood(effect.neighborhood);
+      if (effect.incidents !== undefined) setIncidentDetails(effect.incidents);
+    }
     if (effect.refetchSummary) {
       void refreshWithFallback("Analyst updated the view, but dashboard totals could not refresh.");
     }

@@ -351,4 +351,31 @@ describe("MapWorkspace", () => {
     // set the comparison, and switched to the Compare tab.
     expect(await screen.findByText("More reported incidents at Alpha.")).toBeInTheDocument();
   });
+
+  it("opens the Analyze tab with incidents when the assistant returns analyze_places", async () => {
+    const a: Place = { ...home, id: "a", display_label: "Alpha" };
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([a]));
+    vi.mocked(streamAssistantChat).mockImplementation(async (_payload, handlers) => {
+      handlers.onEvent({
+        event: "tool",
+        data: {
+          tool_name: "analyze_places",
+          result: {
+            place_ids: ["a"],
+            settings_used: { radius_m: 250, analysis_start_date: "2026-01-01", analysis_end_date: "2026-06-30", offense_category: null },
+            neighborhood: makeNeighborhoodAnalysis(),
+            incidents: makeIncidentDetails(),
+          },
+        },
+      });
+      handlers.onEvent({ event: "token", data: { delta: "Analyzed Alpha." } });
+      handlers.onEvent({ event: "done", data: {} });
+    });
+    render(<MapWorkspace />);
+    await screen.findByText("Alpha");
+    fireEvent.change(screen.getByLabelText("Analyst message"), { target: { value: "analyze Alpha" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("100 BLOCK MAIN ST")).toBeInTheDocument();
+  });
 });
