@@ -11,7 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - mca-postgres:/var/lib/postgresql/data
-    restart: unless-stopped
+    restart: "no"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mca -d mca"]
       interval: 5s
@@ -60,7 +60,7 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
-    restart: unless-stopped
+    restart: "no"
     healthcheck:
       # /health is a readiness probe (pings the DB); start_period covers migrate + boot.
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
@@ -88,7 +88,7 @@ services:
       - ${OTP_DATA_DIR:-./otp-data}:/var/opentripplanner
     ports:
       - "8090:8080"
-    restart: unless-stopped
+    restart: "no"
 
 volumes:
   mca-postgres:
