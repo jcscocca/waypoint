@@ -203,7 +203,9 @@ def _compare_places(
 ) -> dict[str, Any]:
     resolved = _resolve_or_select(session, user_id_hash, args.queries, args.place_ids)
     if len(resolved.place_ids) < 2:
-        raise AssistantToolError("Name at least two places to compare.")
+        raise AssistantToolError(
+            "Name at least two places to compare, or select them on the dashboard."
+        )
     # Persist an analysis run at this radius so the dashboard summary has rows for the cards.
     analyze_selected_places(
         session=session,

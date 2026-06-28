@@ -276,4 +276,26 @@ def test_compare_places_by_name_persists_analysis_and_compares(tmp_path, monkeyp
     assert sorted(payload["place_ids"]) == ["place-1", "place-2"]
     assert payload["settings_used"]["radius_m"] == 250
     assert "comparison" in payload
+    assert payload["created"] == []
+    assert payload["unresolved"] == []
+
+
+def test_compare_places_requires_two_places(tmp_path, monkeypatch):
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    monkeypatch.setattr("app.assistant.tools.build_provider", lambda settings: _FakeProvider([]))
+    try:
+        with pytest.raises(AssistantToolError):
+            execute_tool(
+                session,
+                user_hash,
+                "compare_places",
+                {
+                    "queries": ["Library stop"],
+                    "analysis_start_date": "2024-01-01",
+                    "analysis_end_date": "2024-01-31",
+                    "radius_m": 250,
+                },
+            )
+    finally:
+        session.close()
 
