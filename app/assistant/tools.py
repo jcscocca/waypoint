@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import date
 from functools import lru_cache
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from app.analysis.beat_baselines import (
@@ -16,13 +17,17 @@ from app.api.dashboard_schemas import (
     DashboardCompareRequest,
     DashboardIncidentDetailsRequest,
 )
+from app.assistant.place_resolution import ResolvedPlaces, resolve_place_queries  # noqa: F401
 from app.config import get_settings
+from app.geocoding.providers import build_provider
+from app.models import PlaceCluster
 from app.services.dashboard_analysis_service import (
     analyze_selected_places,
     compare_selected_places,
     incident_details_for_places,
 )
 from app.services.dashboard_service import dashboard_summary
+from app.services.manual_place_service import _place_response
 from app.services.neighborhood_service import neighborhood_analysis_for_places
 
 AGENT_INCIDENT_LIMIT = 100
@@ -44,6 +49,57 @@ class AssistantToolError(ValueError):
 
 class EmptyArgs(BaseModel):
     pass
+
+
+class AddPlaceArgs(BaseModel):
+    query: str = Field(min_length=1)
+
+
+class SelectPlacesArgs(BaseModel):
+    queries: list[str] = Field(default_factory=list)
+    mode: str = "replace"
+
+
+class AnalyzePlacesArgs(BaseModel):
+    queries: list[str] = Field(default_factory=list)
+    place_ids: list[str] = Field(default_factory=list)
+    analysis_start_date: date
+    analysis_end_date: date
+    radii_m: list[int] = Field(min_length=1)
+    offense_category: str | None = None
+    offense_subcategory: str | None = None
+    nibrs_group: str | None = None
+
+
+class ComparePlacesByNameArgs(BaseModel):
+    queries: list[str] = Field(default_factory=list)
+    place_ids: list[str] = Field(default_factory=list)
+    analysis_start_date: date
+    analysis_end_date: date
+    radius_m: int = Field(gt=0, le=5000)
+    offense_category: str | None = None
+    offense_subcategory: str | None = None
+    nibrs_group: str | None = None
+
+
+def _add_place(session: Session, user_id_hash: str, query: str) -> dict[str, Any]:
+    provider = build_provider(get_settings())
+    resolved = resolve_place_queries(session, user_id_hash, [query], provider)
+    if not resolved.place_ids:
+        raise AssistantToolError(f"Could not find a place for '{query}'.")
+    place_id = resolved.place_ids[0]
+    place = session.get(PlaceCluster, place_id)
+    was_created = any(entry["place_id"] == place_id for entry in resolved.created)
+    address = next(
+        (entry["address"] for entry in resolved.created if entry["place_id"] == place_id),
+        None,
+    )
+    return {
+        "place": _place_response(place).model_dump(mode="json"),
+        "place_id": place_id,
+        "created": was_created,
+        "address": address,
+    }
 
 
 def execute_tool(
@@ -124,6 +180,10 @@ def execute_tool(
             EmptyArgs.model_validate(arguments)
             result = {"suggestions": _suggest_followups()}
             validated_arguments = {}
+        elif tool_name == "add_place":
+            args = AddPlaceArgs.model_validate(arguments)
+            result = _add_place(session, user_id_hash, args.query)
+            validated_arguments = args.model_dump(mode="json")
         else:
             raise AssistantToolError(f"Unknown assistant tool: {tool_name}")
     except ValidationError as exc:

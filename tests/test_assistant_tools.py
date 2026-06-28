@@ -6,6 +6,7 @@ import pytest
 
 from app.assistant.tools import AssistantToolError, execute_tool
 from app.db import get_sessionmaker
+from app.geocoding.providers import GeocodeHit
 from app.main import create_app
 from app.models import CrimeIncident, PlaceCluster
 from tests.helpers_dashboard import session_with_places_and_beat_crime
@@ -153,4 +154,38 @@ def test_planning_prompt_requests_statistical_interpretation():
     assert "confidence interval" in text
     assert "statistically significant" in text
     assert "adjusted p-value" in text
+
+
+class _FakeProvider:
+    def __init__(self, hits):
+        self._hits = hits
+
+    def search(self, query):
+        return self._hits
+
+
+def test_add_place_geocodes_and_creates(tmp_path, monkeypatch):
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    monkeypatch.setattr(
+        "app.assistant.tools.build_provider",
+        lambda settings: _FakeProvider(
+            [
+                GeocodeHit(
+                    label="Pike Place Market, Seattle",
+                    latitude=47.6097,
+                    longitude=-122.3422,
+                    source="nominatim",
+                )
+            ]
+        ),
+    )
+    try:
+        result = execute_tool(session, user_hash, "add_place", {"query": "Pike Place Market"})
+    finally:
+        session.close()
+    assert result["tool_name"] == "add_place"
+    payload = result["result"]
+    assert payload["created"] is True
+    assert payload["place"]["display_label"] == "Pike Place Market"
+    assert payload["address"] == "Pike Place Market, Seattle"
 
