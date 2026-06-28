@@ -206,3 +206,28 @@ def test_select_places_resolves_and_passes_mode(tmp_path, monkeypatch):
     assert result["result"]["place_ids"] == ["place-1"]
     assert result["result"]["mode"] == "replace"
 
+
+def test_analyze_places_bundles_neighborhood_and_incidents(tmp_path):
+    session, user_hash, place_id = session_with_places_and_beat_crime(tmp_path)
+    try:
+        result = execute_tool(
+            session,
+            user_hash,
+            "analyze_places",
+            {
+                "place_ids": [place_id],  # no queries -> use selection
+                "analysis_start_date": "2026-01-01",
+                "analysis_end_date": "2026-06-30",
+                "radii_m": [250],
+            },
+        )
+    finally:
+        session.close()
+    payload = result["result"]
+    assert result["tool_name"] == "analyze_places"
+    assert payload["place_ids"] == [place_id]
+    assert payload["settings_used"]["radius_m"] == 250
+    assert payload["analysis"]["summary_count"] >= 1
+    assert payload["neighborhood"]["places"][0]["beat"] == "M3"
+    assert "incidents" in payload
+

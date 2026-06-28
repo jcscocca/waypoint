@@ -17,7 +17,7 @@ from app.api.dashboard_schemas import (
     DashboardCompareRequest,
     DashboardIncidentDetailsRequest,
 )
-from app.assistant.place_resolution import ResolvedPlaces, resolve_place_queries  # noqa: F401
+from app.assistant.place_resolution import ResolvedPlaces, resolve_place_queries
 from app.config import get_settings
 from app.geocoding.providers import build_provider
 from app.models import PlaceCluster
@@ -120,6 +120,83 @@ def _add_place(session: Session, user_id_hash: str, query: str) -> dict[str, Any
     }
 
 
+def _resolve_or_select(
+    session: Session,
+    user_id_hash: str,
+    queries: list[str],
+    place_ids: list[str],
+) -> ResolvedPlaces:
+    """Prefer model-named queries; fall back to the backfilled selection ids."""
+    if queries:
+        provider = build_provider(get_settings())
+        return resolve_place_queries(session, user_id_hash, queries, provider)
+    return ResolvedPlaces(place_ids=list(place_ids))
+
+
+def _settings_used(
+    args: AnalyzePlacesArgs | ComparePlacesByNameArgs, radius_m: int
+) -> dict[str, Any]:
+    return {
+        "radius_m": radius_m,
+        "analysis_start_date": args.analysis_start_date.isoformat(),
+        "analysis_end_date": args.analysis_end_date.isoformat(),
+        "offense_category": args.offense_category,
+    }
+
+
+def _analyze_places(session: Session, user_id_hash: str, args: AnalyzePlacesArgs) -> dict[str, Any]:
+    resolved = _resolve_or_select(session, user_id_hash, args.queries, args.place_ids)
+    if not resolved.place_ids:
+        raise AssistantToolError("Name a place to analyze, or select one on the dashboard.")
+    radii = list(dict.fromkeys(args.radii_m))
+    radius_m = radii[0]
+    analysis = analyze_selected_places(
+        session=session,
+        user_id_hash=user_id_hash,
+        place_ids=resolved.place_ids,
+        radii_m=radii,
+        analysis_start_date=args.analysis_start_date,
+        analysis_end_date=args.analysis_end_date,
+        offense_category=args.offense_category,
+        offense_subcategory=args.offense_subcategory,
+        nibrs_group=args.nibrs_group,
+    )
+    neighborhood = neighborhood_analysis_for_places(
+        session=session,
+        user_id_hash=user_id_hash,
+        place_ids=resolved.place_ids,
+        radius_m=radius_m,
+        analysis_start_date=args.analysis_start_date,
+        analysis_end_date=args.analysis_end_date,
+        offense_category=args.offense_category,
+        offense_subcategory=args.offense_subcategory,
+        nibrs_group=args.nibrs_group,
+        area_lookup=_beat_areas(),
+        beat_polygons=_beat_polygons(),
+    )
+    incidents = incident_details_for_places(
+        session=session,
+        user_id_hash=user_id_hash,
+        place_ids=resolved.place_ids,
+        radii_m=[radius_m],
+        analysis_start_date=args.analysis_start_date,
+        analysis_end_date=args.analysis_end_date,
+        offense_category=args.offense_category,
+        offense_subcategory=args.offense_subcategory,
+        nibrs_group=args.nibrs_group,
+        limit=AGENT_INCIDENT_LIMIT,
+    )
+    return {
+        "place_ids": resolved.place_ids,
+        "settings_used": _settings_used(args, radius_m),
+        "analysis": analysis,
+        "neighborhood": neighborhood,
+        "incidents": incidents,
+        "created": resolved.created,
+        "unresolved": resolved.unresolved,
+    }
+
+
 def execute_tool(
     session: Session,
     user_id_hash: str,
@@ -205,6 +282,10 @@ def execute_tool(
         elif tool_name == "select_places":
             args = SelectPlacesArgs.model_validate(arguments)
             result = _select_places(session, user_id_hash, args.queries, args.mode)
+            validated_arguments = args.model_dump(mode="json")
+        elif tool_name == "analyze_places":
+            args = AnalyzePlacesArgs.model_validate(arguments)
+            result = _analyze_places(session, user_id_hash, args)
             validated_arguments = args.model_dump(mode="json")
         else:
             raise AssistantToolError(f"Unknown assistant tool: {tool_name}")
