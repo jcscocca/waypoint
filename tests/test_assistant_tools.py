@@ -140,11 +140,18 @@ def test_get_neighborhood_analysis_exposes_beat_baseline_stats(tmp_path):
         assert field in place
 
 
-def test_neighborhood_tool_is_advertised_to_the_model():
+def test_advertised_menu_is_the_six_poc_tools():
     from app.assistant.semantic_layer import AVAILABLE_TOOLS
 
     names = {tool["name"] for tool in AVAILABLE_TOOLS}
-    assert "get_neighborhood_analysis" in names
+    assert names == {
+        "add_place",
+        "select_places",
+        "analyze_places",
+        "compare_places",
+        "get_dashboard_summary",
+        "suggest_followups",
+    }
 
 
 def test_planning_prompt_requests_statistical_interpretation():

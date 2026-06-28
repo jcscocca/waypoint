@@ -86,12 +86,13 @@ def _select_places(
 ) -> dict[str, Any]:
     normalized_mode = mode if mode in {"replace", "add", "clear"} else "replace"
     if normalized_mode == "clear":
-        return {"place_ids": [], "mode": "clear", "created": [], "unresolved": []}
+        return {"place_ids": [], "mode": "clear", "matched": [], "created": [], "unresolved": []}
     provider = build_provider(get_settings())
     resolved = resolve_place_queries(session, user_id_hash, queries, provider)
     return {
         "place_ids": resolved.place_ids,
         "mode": normalized_mode,
+        "matched": resolved.matched,
         "created": resolved.created,
         "unresolved": resolved.unresolved,
     }

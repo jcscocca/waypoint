@@ -20,6 +20,11 @@ confidence interval exclude 1.0?), explain the interval in plain language, and
 flag caveats (small counts, overdispersion, insufficient data). Never present a
 point estimate as meaningful when its confidence interval includes 1.0 or the
 data are insufficient.
+When the user names places or addresses, pass them as a "queries" list to the
+workflow tool (add_place, select_places, analyze_places, compare_places); do not
+ask the user to select them first. After a tool resolves or creates places, state
+plainly in your final answer what you found or created (for example, "Found
+Capitol Hill at 10th & Pine and saved it").
 During planning, respond with ONE JSON object and NOTHING else: no prose,
 no markdown fences, no reasoning or commentary before or after the JSON.
 Use exactly one of these shapes:
