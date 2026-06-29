@@ -126,6 +126,22 @@ describe("AssistantPanel", () => {
     fireEvent.change(screen.getByLabelText("Analyst message"), { target: { value: "compare" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("Name at least two places to compare.")).toBeInTheDocument();
+    expect(screen.queryByText(/analyst is offline/i)).not.toBeInTheDocument();
+  });
+
+  it("clears the error banner when a retry succeeds", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(sseResponse('event: error\ndata: {"message":"boom"}\n\n'))
+      .mockResolvedValueOnce(
+        sseResponse('event: token\ndata: {"delta":"ok"}\n\nevent: done\ndata: {}\n\n'),
+      );
+    render(<AssistantPanel dashboardState={dashboardState} />);
+    fireEvent.change(screen.getByLabelText("Analyst message"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("boom");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await screen.findByText("ok");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("falls back to the offline copy on a transport failure", async () => {

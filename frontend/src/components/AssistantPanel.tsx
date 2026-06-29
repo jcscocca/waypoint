@@ -49,8 +49,8 @@ export function AssistantPanel({ dashboardState, onToolResult }: Props) {
               setDraft(assistantText);
             }
             if (event.event === "error") {
+              if (!errored) turnError = String(event.data.message ?? "").trim();
               errored = true;
-              turnError = String(event.data.message ?? "").trim();
             }
           },
         },
