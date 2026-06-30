@@ -144,4 +144,27 @@ describe("RoutesTab", () => {
     const stored = JSON.parse(localStorage.getItem("waypoint.search.recent") ?? "[]");
     expect(stored[0].label).toBe("400 Broad St, Seattle");
   });
+
+  it("keeps a recent place selected as From across a later search for a different address", async () => {
+    const pike = { label: "Pike Place Market, Seattle", latitude: 47.6097, longitude: -122.3331, source: "nominatim" };
+    localStorage.setItem("waypoint.search.recent", JSON.stringify([pike]));
+    const capitol = { label: "Capitol Hill, Seattle", latitude: 47.625, longitude: -122.322, source: "nominatim" };
+    const geocodeSearch = vi.fn().mockResolvedValue([capitol]);
+    render(<RoutesTab analysis={analysis} running={false} places={places} geocodeSearch={geocodeSearch} onRun={vi.fn()} />);
+
+    // Pick the recent place as From — the From field collapses to the chosen view.
+    fireEvent.click(within(screen.getByRole("list", { name: "From options" })).getByRole("button", { name: "Pike Place Market, Seattle" }));
+    expect(within(screen.getByRole("list", { name: "To options" })).getByRole("button", { name: "Pike Place Market, Seattle" })).toBeInTheDocument();
+
+    // Now search for a different address; geoResults populate and unselected recents leave the list.
+    fireEvent.change(screen.getByLabelText(/find an address/i), { target: { value: "cap" } });
+    fireEvent.click(screen.getByRole("button", { name: /^search$/i }));
+    await screen.findAllByRole("button", { name: /Capitol Hill/ });
+
+    // The chosen From, scoped to its own field, still shows the recent place — the selection
+    // survived the search (the bug dropped it from `options`, reverting From to unselected).
+    const fromField = screen.getByText("From").closest(".mc-field") as HTMLElement;
+    expect(within(fromField).getByText("Pike Place Market, Seattle")).toBeInTheDocument();
+    expect(within(fromField).getByRole("button", { name: "Change" })).toBeInTheDocument();
+  });
 });

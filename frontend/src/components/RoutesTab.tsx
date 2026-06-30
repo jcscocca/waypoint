@@ -119,29 +119,24 @@ export function RoutesTab({ analysis, running, result, error, places, geocodeSea
       geoResult: g,
     }));
 
-    // Show recent options only when there is no active geo search result set.
-    // Dedup recent against place and geo keys.
+    // Recent options fill the From/To pickers when there's no active search. During an
+    // active search (geoResults present) most recents yield to the search results, but a
+    // recent that is the currently-selected origin/destination must stay in `options` — the
+    // selection is derived from this same array, so dropping it would silently revert the
+    // chosen endpoint. Dedup recent against place and geo keys.
     const existingKeys = new Set([...placeOptions.map((o) => o.key), ...geoOptions.map((o) => o.key)]);
-    const recentOptions = geoResults.length === 0
-      ? recent
-        .map((r) => ({
-          key: `geo:${r.latitude},${r.longitude}`,
-          label: r.label,
-          input: { latitude: r.latitude, longitude: r.longitude, label: r.label } as RouteEndpointInput,
-          geoResult: r,
-        }))
-        .filter((o) => !existingKeys.has(o.key))
-      : [];
+    const recentOptions = recent
+      .map((r) => ({
+        key: `geo:${r.latitude},${r.longitude}`,
+        label: r.label,
+        input: { latitude: r.latitude, longitude: r.longitude, label: r.label } as RouteEndpointInput,
+        geoResult: r,
+      }))
+      .filter((o) => !existingKeys.has(o.key))
+      .filter((o) => geoResults.length === 0 || o.key === originKey || o.key === destinationKey);
 
     return [...placeOptions, ...geoOptions, ...recentOptions];
-  }, [places, geoResults, recent]);
-
-  function handleEndpointSelect(key: string, geoResult?: GeocodeResult) {
-    if (geoResult) {
-      rememberPlace(geoResult);
-    }
-    return key;
-  }
+  }, [places, geoResults, recent, originKey, destinationKey]);
 
   const recommendedId = result?.statistical_comparison?.overview.recommendation_option_id ?? null;
   const originOption = options.find((o) => o.key === originKey) ?? null;
@@ -172,14 +167,14 @@ export function RoutesTab({ analysis, running, result, error, places, geocodeSea
           label="From"
           options={options}
           selectedKey={originKey}
-          onSelect={(key, geoResult) => setOriginKey(handleEndpointSelect(key, geoResult))}
+          onSelect={(key, geoResult) => { if (geoResult) rememberPlace(geoResult); setOriginKey(key); }}
         />
         <EndpointChooser
           idBase="route-destination"
           label="To"
           options={options}
           selectedKey={destinationKey}
-          onSelect={(key, geoResult) => setDestinationKey(handleEndpointSelect(key, geoResult))}
+          onSelect={(key, geoResult) => { if (geoResult) rememberPlace(geoResult); setDestinationKey(key); }}
         />
         <div className="mc-field">
           <label id="route-mode-label">Mode</label>
