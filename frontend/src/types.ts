@@ -224,7 +224,7 @@ export type NeighborhoodPlace = {
   minimum_data_status?: string;
   nearest_incident_m?: number | null;
   monthly_counts?: number[];
-  type_mix: { label: string; count: number }[];
+  category_breakdown: { label: string; place_count: number; place_share: number; beat_share: number | null }[];
   temporal?: TemporalProfile | null;
 };
 
