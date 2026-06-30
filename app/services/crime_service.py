@@ -242,6 +242,7 @@ def _summary_model(summary: PlaceCrimeSummaryData) -> PlaceCrimeSummary:
         incidents_per_hour_dwell=float(summary.incidents_per_hour_dwell)
         if summary.incidents_per_hour_dwell is not None
         else None,
+        layer=summary.layer,
     )
 
 

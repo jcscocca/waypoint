@@ -24,7 +24,7 @@ user-scoped table carries `user_id_hash` (a hashed session identity; see §2). S
 | Entity | Table | Purpose | Key columns |
 |---|---|---|---|
 | `CrimeIncident` | `crime_incidents` | Imported SPD incident-context record (reported crime, arrest, or 911 call). Not user-scoped — shared across all sessions. Uniqueness is composite `(source_dataset, external_incident_id)`; `source_dataset` (indexed) is `seattle_spd_crime` (reported incidents), `seattle_spd_arrests`, or `seattle_spd_911` (calls for service). `offense_subcategory` is overloaded per source: offense parent group (crime), NIBRS offense description (arrests), or final call type (911). For arrest and 911 rows `offense_category`/`nibrs_group` are null. 911 rows use `cad_event_number` as `external_incident_id`, which collapses the dataset's per-responding-unit rows to one row per call; redacted dispatch coordinates ("REDACTED") map to null lat/long. | `source_dataset` (indexed), `external_incident_id`, `offense_start_utc`, `offense_category`, `offense_subcategory`, `nibrs_group`, `precinct`, `sector`, `beat`, `mcpp`, `latitude`, `longitude` |
-| `PlaceCrimeSummary` | `place_crime_summaries` | Pre-aggregated incident counts for a `PlaceCluster` at a given radius and date window. Invalidated and regenerated whenever normalization reruns. | `place_cluster_id` → `place_clusters`, `radius_m`, `analysis_start_date`, `analysis_end_date`, `offense_category`, `incident_count`, `nearest_incident_m`, `incidents_per_visit`, `incidents_per_hour_dwell`, `analysis_run_id` |
+| `PlaceCrimeSummary` | `place_crime_summaries` | Pre-aggregated incident counts for a `PlaceCluster` at a given radius and date window. Invalidated and regenerated whenever normalization reruns. `layer` records which analysis layer produced it (`reported`/`calls`; null = legacy, read as `reported`) so the summary totals, PlacesTab counts, and exports label themselves correctly. | `place_cluster_id` → `place_clusters`, `radius_m`, `analysis_start_date`, `analysis_end_date`, `offense_category`, `incident_count`, `nearest_incident_m`, `incidents_per_visit`, `incidents_per_hour_dwell`, `analysis_run_id`, `layer` |
 
 **Sources, layers, and the `report_number` linkage.** The three `source_dataset` values are grouped
 into two mutually-exclusive analysis *layers* (`app/crime/sources.py::LAYERS`): a **reported** layer
@@ -164,6 +164,7 @@ Alembic manages the Postgres production schema; 7 migration scripts live in
 | `0006_analysis_runs.py` | Adds `analysis_runs` table |
 | `0007_geocode_cache.py` | Adds `geocode_cache` table |
 | `0008_crime_source_unique.py` | Replaces the single-column unique on `crime_incidents.external_incident_id` with a composite unique `(source_dataset, external_incident_id)` + indexes `source_dataset`; dialect-branched for SQLite/Postgres |
+| `0009_summary_layer.py` | Adds a nullable `layer` column to `analysis_runs` and `place_crime_summaries` (records which analysis layer produced a run/summary; null = legacy, read as `reported`) |
 
 **Dual bootstrap path** (`app/db.init_db`):
 

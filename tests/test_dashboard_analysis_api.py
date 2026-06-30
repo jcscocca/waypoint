@@ -194,6 +194,26 @@ def test_dashboard_incidents_reported_layer_unions_crime_and_arrests(tmp_path):
     assert {row["incident_id"] for row in default["incidents"]} == reported_ids
 
 
+def test_dashboard_summary_reports_the_analyzed_layer(tmp_path):
+    client = _client_with_places_and_crime(tmp_path)
+    _seed_layered_incident(client, source="seattle_spd_911", external_id="call-1")
+    place_id = client.get("/places").json()["places"][0]["id"]
+    body = {
+        "place_ids": [place_id],
+        "analysis_start_date": "2024-01-01",
+        "analysis_end_date": "2024-01-31",
+        "radii_m": [250],
+    }
+
+    client.post("/dashboard/analyze", json={**body, "layer": "calls"})
+    summary = client.get("/dashboard/summary").json()
+    assert summary["layer"] == "calls"
+
+    client.post("/dashboard/analyze", json={**body, "layer": "reported"})
+    summary = client.get("/dashboard/summary").json()
+    assert summary["layer"] == "reported"
+
+
 def test_dashboard_analyze_rejects_unknown_layer(tmp_path):
     client = _client_with_places_and_crime(tmp_path)
     place_id = client.get("/places").json()["places"][0]["id"]

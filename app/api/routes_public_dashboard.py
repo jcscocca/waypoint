@@ -63,6 +63,7 @@ def analyze_dashboard_places(
             offense_subcategory=request.offense_subcategory,
             nibrs_group=request.nibrs_group,
             sources=sources_for_layer(request.layer),
+            layer=request.layer,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

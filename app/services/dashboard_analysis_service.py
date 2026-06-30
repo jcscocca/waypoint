@@ -33,6 +33,7 @@ def analyze_selected_places(
     offense_subcategory: str | None,
     nibrs_group: str | None,
     sources: Sequence[str] | None = None,
+    layer: str | None = None,
 ) -> dict[str, int]:
     _validate_date_range(analysis_start_date, analysis_end_date)
     clusters = [_cluster_data(row) for row in _selected_clusters(session, user_id_hash, place_ids)]
@@ -63,10 +64,12 @@ def analyze_selected_places(
         offense_category=offense_category,
         offense_subcategory=offense_subcategory,
         nibrs_group=nibrs_group,
+        layer=layer,
     )
     models = [_summary_model(summary) for summary in summaries]
     for model in models:
         model.analysis_run_id = run.id
+        model.layer = layer
     session.add_all(models)
     session.commit()
     return {"summary_count": len(summaries)}

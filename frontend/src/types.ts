@@ -50,6 +50,9 @@ export type IncidentDetailsResponse = {
 };
 
 export type DashboardSummary = {
+  /** The layer the persisted totals were computed for (server always sends it; optional so
+   * fixtures predating it still type-check). Absent is treated as "reported". */
+  layer?: LayerKey;
   totals: {
     place_count: number;
     visit_count: number;
