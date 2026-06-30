@@ -451,3 +451,8 @@ input.mc-inp:focus{outline:2px solid var(--clay-soft);outline-offset:1px;}
 .mc-incident-reveal>summary:hover{color:var(--text);}
 .mc-incident-reveal>summary::-webkit-details-marker{display:none;}
 .mc-analytical>summary::-webkit-details-marker{display:none;}
+
+/* Recent searches — reuses mc-results list look; adds a small section heading */
+.mc-recent-wrap{display:grid;gap:6px;}
+.mc-recent-heading{margin:0;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);}
+.mc-recent{border-top:1px solid var(--line);padding-top:6px;}
