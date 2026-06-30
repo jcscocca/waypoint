@@ -40,8 +40,29 @@ export function useAddressSearch(
   const [status, setStatus] = useState<AddressSearchStatus>("idle");
   const [recent, setRecent] = useState<GeocodeResult[]>(() => loadRecentPlaces());
 
+  // abortRef holds the in-flight request's controller and is shared by the debounce effect
+  // and runSearch. When the query changes, the effect may abort an in-flight runSearch
+  // request via this shared ref; that is benign and self-heals on the next debounce — the
+  // newer query's result is the one we want, and the aborted older request is ignored.
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Single source of truth for the empty/done/error + abort-guard logic, shared by the
+  // debounce effect and runSearch.
+  function runFetch(trimmed: string, controller: AbortController): Promise<void> {
+    setStatus("loading");
+    return search(trimmed, controller.signal)
+      .then((found) => {
+        if (controller.signal.aborted) return;
+        setResults(found);
+        setStatus(found.length === 0 ? "empty" : "done");
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setResults([]);
+        setStatus("error");
+      });
+  }
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -64,18 +85,7 @@ export function useAddressSearch(
 
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      setStatus("loading");
-      search(trimmed, controller.signal)
-        .then((found) => {
-          if (controller.signal.aborted) return;
-          setResults(found);
-          setStatus(found.length === 0 ? "empty" : "done");
-        })
-        .catch(() => {
-          if (controller.signal.aborted) return;
-          setResults([]);
-          setStatus("error");
-        });
+      void runFetch(trimmed, controller);
     }, DEBOUNCE_MS);
 
     return () => {
@@ -100,17 +110,7 @@ export function useAddressSearch(
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setStatus("loading");
-    try {
-      const found = await search(trimmed, controller.signal);
-      if (controller.signal.aborted) return;
-      setResults(found);
-      setStatus(found.length === 0 ? "empty" : "done");
-    } catch {
-      if (controller.signal.aborted) return;
-      setResults([]);
-      setStatus("error");
-    }
+    await runFetch(trimmed, controller);
   }
 
   function rememberPlace(result: GeocodeResult) {

@@ -11,7 +11,10 @@ export function loadRecentPlaces(): GeocodeResult[] {
   try {
     const raw = localStorage.getItem(RECENT_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as GeocodeResult[];
+    const parsed = JSON.parse(raw);
+    // Guard against valid-but-wrong-shape JSON (tampering / a future schema change):
+    // a non-array would otherwise make addRecentPlace's .filter(...) throw uncaught.
+    return Array.isArray(parsed) ? (parsed as GeocodeResult[]) : [];
   } catch {
     // private mode or disabled storage degrades to empty list
     return [];

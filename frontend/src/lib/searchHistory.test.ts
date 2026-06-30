@@ -59,6 +59,14 @@ describe("searchHistory", () => {
     expect(loaded[2].label).toBe(pike.label);
   });
 
+  it("returns an empty list when stored JSON is valid but not an array", () => {
+    localStorage.setItem("waypoint.search.recent", '{"x":1}');
+    expect(loadRecentPlaces()).toEqual([]);
+    // and a subsequent add does not throw on the bad shape
+    const result = addRecentPlace(pike);
+    expect(result).toEqual([pike]);
+  });
+
   it("falls back to an empty list when localStorage throws on read", () => {
     vi.spyOn(localStorage, "getItem").mockImplementation(() => {
       throw new Error("blocked");
