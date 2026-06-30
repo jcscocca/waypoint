@@ -278,6 +278,7 @@ def _incident_detail_rows(
                     "place_label": cluster.display_label or "Selected place",
                     "incident_id": incident.id,
                     "external_incident_id": incident.external_incident_id,
+                    "source_dataset": incident.source_dataset,
                     "report_number": incident.report_number,
                     "occurred_at": _utc_json_datetime(incident.offense_start_utc),
                     "reported_at": _utc_json_datetime(incident.report_utc),
