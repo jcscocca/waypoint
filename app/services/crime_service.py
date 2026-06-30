@@ -39,18 +39,19 @@ def _as_iso(value: object) -> str | None:
 # every load. Cache it in-process: the dataset updates ~daily via backfill and the pill exists to
 # signal the data is NOT live, so a short staleness window is invisible.
 FRESHNESS_CACHE_TTL_S = 300.0
-_freshness_cache: dict[str, object] | None = None
-_freshness_expires: float = 0.0
+_freshness_cache: dict[str, dict[str, object]] = {}
+_freshness_expires: dict[str, float] = {}
 
 
 def reset_freshness_cache() -> None:
-    """Drop the cached freshness value (tests, or explicit invalidation)."""
-    global _freshness_cache, _freshness_expires
-    _freshness_cache = None
-    _freshness_expires = 0.0
+    """Drop cached freshness values (tests, or explicit invalidation)."""
+    _freshness_cache.clear()
+    _freshness_expires.clear()
 
 
-def _compute_freshness(session: Session) -> dict[str, object]:
+def _compute_freshness(
+    session: Session, source_dataset: str = SOURCE_SPD_CRIME
+) -> dict[str, object]:
     observed = func.coalesce(CrimeIncident.offense_start_utc, CrimeIncident.report_utc)
     count, data_through, earliest, last_ingested_at = session.execute(
         select(
@@ -58,7 +59,7 @@ def _compute_freshness(session: Session) -> dict[str, object]:
             func.max(observed),
             func.min(observed),
             func.max(CrimeIncident.snapshot_at),
-        )
+        ).where(CrimeIncident.source_dataset == source_dataset)
     ).one()
     return {
         "incident_count": count or 0,
@@ -69,23 +70,22 @@ def _compute_freshness(session: Session) -> dict[str, object]:
 
 
 def crime_data_freshness(
-    session: Session, *, now: Callable[[], float] = monotonic
+    session: Session,
+    *,
+    source_dataset: str = SOURCE_SPD_CRIME,
+    now: Callable[[], float] = monotonic,
 ) -> dict[str, object]:
-    """Coverage/freshness of the (global, shared) reported-incident dataset: how many
-    incidents, the date range they span, and when they were last ingested. Powers a
-    "reported incidents through <date>" surface so users know the data isn't live.
-
-    Cached in-process for ``FRESHNESS_CACHE_TTL_S`` to avoid a full-table aggregate on every
-    dashboard load; a race only causes a redundant recompute, so no lock is needed.
+    """Coverage/freshness of one crime source (default: SPD reports). Cached in-process per
+    source for ``FRESHNESS_CACHE_TTL_S`` to avoid a full-table aggregate on every dashboard
+    load; a race only causes a redundant recompute, so no lock is needed. The returned dict
+    is shared across cache hits — treat it as read-only.
     """
-    global _freshness_cache, _freshness_expires
-    # The cached dict is returned by reference and shared across cache hits; callers must treat
-    # it as read-only (the sole caller hands it straight to JSON serialization).
-    if _freshness_cache is not None and now() < _freshness_expires:
-        return _freshness_cache
-    value = _compute_freshness(session)
-    _freshness_cache = value
-    _freshness_expires = now() + FRESHNESS_CACHE_TTL_S
+    cached = _freshness_cache.get(source_dataset)
+    if cached is not None and now() < _freshness_expires.get(source_dataset, 0.0):
+        return cached
+    value = _compute_freshness(session, source_dataset)
+    _freshness_cache[source_dataset] = value
+    _freshness_expires[source_dataset] = now() + FRESHNESS_CACHE_TTL_S
     return value
 
 
