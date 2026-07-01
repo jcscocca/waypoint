@@ -82,7 +82,13 @@ the data/ops durability, and the product-breadth items are all closed. No queued
 **New capabilities**
 - [x] **C1 · Temporal analysis** — descriptive hour-of-day + day-of-week incident profiles around a place, with a travel-window highlight, on the Analyze tab. Pure `app/analysis/temporal.py` wired into the analyze path; `offense_start_utc` read as naive Seattle local. Spec/plan: `docs/superpowers/{specs,plans}/2026-06-29-temporal-analysis*`.
 - [x] **C2 · Incident category breakdown** — shipped: `_category_breakdown` replaces `type_mix`; each subcategory shows place-share vs rest-of-beat share (null when no baseline), top-6 + "Other"; descriptive (no per-category significance — deferred); renders on the Analyze tab for baseline-available and degraded places alike. Spec/plan: `docs/superpowers/{specs,plans}/2026-06-29-category-breakdown*`.
-- [ ] **C3 · Saved views** — lightweight cross-session persistence to save & revisit an analysis/comparison.
+- [x] **C3 · Saved views** — increment 1 shipped (#78): durable, shareable `?view=` links
+  for **Analyze & Compare** that recompute on open and store nothing new server-side. Enabled by
+  making analyze/compare/incidents/neighborhood accept inline `points` (Seattle-bbox-validated,
+  ≤10) as an alternative to identity-bound `place_ids`; the points path is stateless (no
+  `AnalysisRun`/`PlaceCrimeSummary` write). Links carry only generalized (~110 m) coordinates; no
+  account. Spec/plan: `docs/superpowers/{specs,plans}/2026-06-30-saved-views*`. _Increment 2
+  (queued): **Routes saved views** — extend shareable views to the Routes corridor tab._
 - [x] **C4 · Second data source** — shipped across two increments. **Inc 1 (#75):** a
   source-aware crime layer (queries / freshness / backfill watermark all default to SPD
   reports, so existing analyses are unchanged) plus SPD **Arrest Data** (`9bjs-7a7w`) ingest
