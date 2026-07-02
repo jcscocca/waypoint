@@ -1325,3 +1325,34 @@ def test_agent_redirects_evitar_finite_inflections(tmp_path):
             assert client.calls == [], phrasing
     finally:
         session.close()
+
+
+def test_agent_redirects_rank_verb_with_punctuation_before_noun(tmp_path):
+    # H4 follow-up · Finding 5: directive-style rank/rate/score with punctuation ("Rank: my
+    # places", "Clasifica: estos barrios", "Score, the neighborhoods") bypasses the H4 arms
+    # because they hard-require \s+ right after the verb. Widen to a bounded punctuation class.
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    phrasings = [
+        "Rank: my places",
+        "Score, the neighborhoods",
+        "Rate — these blocks",
+        "Clasifica: estos barrios",
+        "Puntúa, las rutas",
+    ]
+    try:
+        for phrasing in phrasings:
+            client = FakeClient(['{"type":"final","message":"OK."}'])
+            events = asyncio.run(
+                _collect(
+                    session,
+                    user_hash,
+                    [AssistantChatMessage(role="user", content=phrasing)],
+                    AssistantDashboardState(selected_place_ids=["place-1"]),
+                    client,
+                )
+            )
+            assert [event.event for event in events] == ["meta", "token", "done"], phrasing
+            assert "reported incident" in events[1].data["delta"], phrasing
+            assert client.calls == [], phrasing
+    finally:
+        session.close()
