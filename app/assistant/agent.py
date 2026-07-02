@@ -20,14 +20,17 @@ from app.assistant.tools import AssistantClarification, AssistantToolError, exec
 from app.config import get_settings
 
 # Reject requests that ask the assistant to score/rank places by safety, danger, or risk —
-# the product invariant forbids it. Two arms: (1) a safety-vocabulary lexicon, and (2) a
-# rank/rate/score verb followed (through any run of determiners/possessives) by a place noun.
+# the product invariant forbids it. Arms: (1) an English safety-vocabulary lexicon (including
+# colloquial place-character slang like "sketchy"/"shady"), (2) an English rank/rate/score
+# verb followed (through any run of determiners/possessives) by a place noun, and (3+4) the
+# Spanish mirrors of both. Event/offense descriptors ("violent", "threatening", "menacing")
+# are deliberately excluded — they are legitimate incident context, not place-ranking words.
 # Word-boundary matching keeps legitimate substrings ("safely", "Safeway", "incident rate")
 # and allowed count framing ("which area has the most crime") from false-triggering. The guard
 # runs on BOTH the incoming user text and the model's final answer (see run_assistant_turn).
 _SAFETY_SCORE_PATTERN = re.compile(
     r"\b(?:safe(?:ty|st|r)?|unsafe|danger(?:ous)?|hazard(?:ous)?|peril(?:ous)?"
-    r"|risk(?:y|ier|iest)?)\b"
+    r"|risk(?:y|ier|iest)?|sketchy|shady|dodgy|seedy|scary|frightening|ghetto)\b"
     r"|\bcrime[-\s]free\b"
     r"|\b(?:rank|rate|score)\b\s+"
     r"(?:(?:the|these|those|this|that|them|my|your|our|their|its|his|her|a|an|all|both"

@@ -752,3 +752,36 @@ def test_analyze_places_settings_used_matches_bridge_contract(tmp_path):
         "layer",
     }
 
+
+def test_agent_redirects_colloquial_area_judgment_terms(tmp_path):
+    # H4: colloquial adjectives that judge a *place's* safety character must trip the guard
+    # before any model call. (Event/offense descriptors like "threatening" are deliberately
+    # NOT here — see test_agent_does_not_redirect_neutral_spanish_or_incident_terms.)
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    phrasings = [
+        "Is this a sketchy area?",
+        "Is that block shady?",
+        "That neighborhood seems dodgy.",
+        "Is downtown seedy?",
+        "Is it scary here at night?",
+        "Is this a frightening part of town?",
+        "Is this a ghetto neighborhood?",
+    ]
+    try:
+        for phrasing in phrasings:
+            client = FakeClient(['{"type":"final","message":"OK."}'])
+            events = asyncio.run(
+                _collect(
+                    session,
+                    user_hash,
+                    [AssistantChatMessage(role="user", content=phrasing)],
+                    AssistantDashboardState(selected_place_ids=["place-1"]),
+                    client,
+                )
+            )
+            assert [event.event for event in events] == ["meta", "token", "done"], phrasing
+            assert "reported incident" in events[1].data["delta"], phrasing
+            assert client.calls == [], phrasing
+    finally:
+        session.close()
+
