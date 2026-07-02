@@ -164,7 +164,7 @@ export type GeocodeResult = {
 
 /** Which incident-context layer the dashboard queries. "reported" unions SPD crime +
  * arrests; "calls" is 911 calls for service. The two are mutually exclusive. */
-export type LayerKey = "reported" | "calls";
+export type LayerKey = "reported" | "arrests" | "calls";
 
 export type AnalysisSettings = {
   startDate: string;
