@@ -1145,3 +1145,62 @@ def test_agent_does_not_redirect_spanish_colloquial_filler(tmp_path):
             assert events[1].data["delta"] == "Here is the reported context.", phrasing
     finally:
         session.close()
+
+
+def test_agent_redirects_spanish_mal_place_compound(tmp_path):
+    # H4 follow-up · Finding 1b: "mal barrio"/"mala zona"/"malos vecindarios" are compound
+    # judgments with the place noun baked in — unambiguous safety-ranking language, must trip.
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    phrasings = [
+        "¿Es un mal barrio?",
+        "Es una mala zona",
+        "Es un mal vecindario",
+        "Son malos barrios",
+        "Es un mal sector",
+        "Es un mal lugar",
+    ]
+    try:
+        for phrasing in phrasings:
+            client = FakeClient(['{"type":"final","message":"OK."}'])
+            events = asyncio.run(
+                _collect(
+                    session,
+                    user_hash,
+                    [AssistantChatMessage(role="user", content=phrasing)],
+                    AssistantDashboardState(selected_place_ids=["place-1"]),
+                    client,
+                )
+            )
+            assert [event.event for event in events] == ["meta", "token", "done"], phrasing
+            assert "reported incident" in events[1].data["delta"], phrasing
+            assert client.calls == [], phrasing
+    finally:
+        session.close()
+
+
+def test_agent_does_not_redirect_mal_without_place_noun(tmp_path):
+    # H4 follow-up · Finding 1b allow-list: "mal + non-place-noun" must reach the model
+    # (mala idea = bad idea, mal día = bad day, malos vecinos = bad neighbors — none are
+    # place nouns even though "vecinos" is close to "vecindario").
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    phrasings = [
+        "Fue una mala idea",
+        "Un mal día",
+        "Tengo malos vecinos",
+    ]
+    try:
+        for phrasing in phrasings:
+            client = FakeClient(['{"type":"final","message":"Here is the reported context."}'])
+            events = asyncio.run(
+                _collect(
+                    session,
+                    user_hash,
+                    [AssistantChatMessage(role="user", content=phrasing)],
+                    AssistantDashboardState(selected_place_ids=["place-1"]),
+                    client,
+                )
+            )
+            assert len(client.calls) == 1, phrasing
+            assert events[1].data["delta"] == "Here is the reported context.", phrasing
+    finally:
+        session.close()
