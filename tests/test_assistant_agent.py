@@ -1396,3 +1396,93 @@ def test_h4_phrasings_still_covered_by_helper():
         assert _contains_safety_ranking(phrasing), phrasing
     for phrasing in must_pass:
         assert not _contains_safety_ranking(phrasing), phrasing
+
+
+def test_agent_does_not_redirect_estar_seguro_or_tranquilo_with_place(tmp_path):
+    # Final-review fix: ESTAR + seguro/tranquilo is epistemic/emotional filler ("I'm sure",
+    # "I'm calm"), distinct from place-safety SER ("es seguro este barrio"). Must reach the
+    # model even when a place word co-occurs — a user unsure of an incident's location is a
+    # normal question.
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    phrasings = [
+        "No estoy seguro de la ubicación",
+        "No estoy seguro de esta zona",
+        "¿Estás seguro de que fue en este barrio?",
+        "No estoy seguro de qué ruta tomó",
+        "Estoy tranquilo en esta zona",
+    ]
+    try:
+        for phrasing in phrasings:
+            client = FakeClient(['{"type":"final","message":"Here is the reported context."}'])
+            events = asyncio.run(
+                _collect(
+                    session,
+                    user_hash,
+                    [AssistantChatMessage(role="user", content=phrasing)],
+                    AssistantDashboardState(selected_place_ids=["place-1"]),
+                    client,
+                )
+            )
+            assert len(client.calls) == 1, phrasing
+            assert events[1].data["delta"] == "Here is the reported context.", phrasing
+    finally:
+        session.close()
+
+
+def test_agent_still_redirects_ser_seguro_place_safety(tmp_path):
+    # Final-review fix guard: place-safety with SER must STILL trip — only ESTAR-filler is
+    # excluded. These are genuine "is this place safe?" asks.
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    phrasings = [
+        "¿Es seguro este barrio?",
+        "¿Es segura esta zona?",
+        "¿Qué tan seguro es este lugar?",
+    ]
+    try:
+        for phrasing in phrasings:
+            client = FakeClient(['{"type":"final","message":"OK."}'])
+            events = asyncio.run(
+                _collect(
+                    session,
+                    user_hash,
+                    [AssistantChatMessage(role="user", content=phrasing)],
+                    AssistantDashboardState(selected_place_ids=["place-1"]),
+                    client,
+                )
+            )
+            assert [event.event for event in events] == ["meta", "token", "done"], phrasing
+            assert "reported incident" in events[1].data["delta"], phrasing
+            assert client.calls == [], phrasing
+    finally:
+        session.close()
+
+
+def test_agent_redirects_postposed_barrio_malo(tmp_path):
+    # Final-review fix: postposed adjective "barrio malo"/"zona mala" is the same place-label
+    # as the preposed "mal barrio" (Finding 1b) and must trip — a reordering must not bypass.
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    phrasings = [
+        "¿Es un barrio malo?",
+        "Es una zona mala",
+        "Son barrios malos",
+        "Es un lugar malo",
+        "Es un sector malo",
+        "Son sectores malos",
+    ]
+    try:
+        for phrasing in phrasings:
+            client = FakeClient(['{"type":"final","message":"OK."}'])
+            events = asyncio.run(
+                _collect(
+                    session,
+                    user_hash,
+                    [AssistantChatMessage(role="user", content=phrasing)],
+                    AssistantDashboardState(selected_place_ids=["place-1"]),
+                    client,
+                )
+            )
+            assert [event.event for event in events] == ["meta", "token", "done"], phrasing
+            assert "reported incident" in events[1].data["delta"], phrasing
+            assert client.calls == [], phrasing
+    finally:
+        session.close()
