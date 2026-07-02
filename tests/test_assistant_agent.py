@@ -814,3 +814,33 @@ def test_agent_redirects_spanish_safety_phrasings(tmp_path):
             assert client.calls == [], phrasing
     finally:
         session.close()
+
+
+def test_agent_redirects_spanish_bare_rank_requests(tmp_path):
+    # H4: Spanish rank/rate/score verbs targeting a place noun (no safety word present) must
+    # trip the guard, mirroring the English object-first rank arm. Includes accent-free forms.
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    phrasings = [
+        "Clasifica estos barrios",
+        "Califica estas zonas",
+        "Puntúa las rutas",
+        "clasifica estas areas",  # accent-free "áreas"
+        "Clasifica los lugares por favor",
+    ]
+    try:
+        for phrasing in phrasings:
+            client = FakeClient(['{"type":"final","message":"OK."}'])
+            events = asyncio.run(
+                _collect(
+                    session,
+                    user_hash,
+                    [AssistantChatMessage(role="user", content=phrasing)],
+                    AssistantDashboardState(selected_place_ids=["place-1"]),
+                    client,
+                )
+            )
+            assert [event.event for event in events] == ["meta", "token", "done"], phrasing
+            assert "reported incident" in events[1].data["delta"], phrasing
+            assert client.calls == [], phrasing
+    finally:
+        session.close()

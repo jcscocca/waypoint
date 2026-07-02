@@ -38,7 +38,12 @@ _SAFETY_SCORE_PATTERN = re.compile(
     r"(?:place|block|area|neighbou?rhood|route|street|spot|option|location)s?\b"
     r"|\b(?:segur[oa]s?|insegur[oa]s?|peligros[oa]s?|peligro|riesgos[oa]s?|riesgos?"
     r"|arriesgad[oa]s?)\b"
-    r"|\blibre\s+de\s+crimen\b",
+    r"|\blibre\s+de\s+crimen\b"
+    r"|\b(?:clasific|ranke|calific|puntu|puntú)\w*\s+"
+    r"(?:(?:el|la|los|las|este|esta|estos|estas|ese|esa|esos|esas|mi|mis|tu|tus|su|sus"
+    r"|un|una|unos|unas|todo|toda|todos|todas|cada)\s+)*"
+    r"(?:lugar(?:es)?|(?:zona|barrio|[aá]rea|calle|ruta|sitio|cuadra)s?"
+    r"|ubicaci[oó]n(?:es)?)\b",
     re.IGNORECASE,
 )
 
