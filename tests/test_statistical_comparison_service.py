@@ -819,6 +819,11 @@ def test_compare_route_request_tests_divergent_corridors_only(tmp_path):
     pairwise = result["analytical"]["pairwise_results"][0]
     assert pairwise["incident_count_a"] == 10
     assert pairwise["incident_count_b"] == 150
+    # Divergent exposure is a strict subset of the whole corridor, and B's long jog
+    # diverges far more than A's straight — pins that divergent (not whole-corridor)
+    # exposures reached the persisted rows, and that sides weren't swapped.
+    assert pairwise["exposure_a"] < options["Route A"]["exposure"]
+    assert pairwise["exposure_b"] > pairwise["exposure_a"]
     assert "only the divergent segments were compared" in pairwise["caveat_text"]
     assert result["overview"]["decision_class"] == "statistically_lower"
     assert result["overview"]["recommendation_label"] == "Route A"
