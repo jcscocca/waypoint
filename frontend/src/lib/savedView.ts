@@ -44,7 +44,6 @@ export function encodeView(view: SavedView): string {
   return toBase64Url(JSON.stringify(wire));
 }
 
-// Parse one wire point.
 function readWirePoint(raw: unknown): ViewPoint | null {
   if (!raw || typeof raw !== "object") return null;
   const { y, x, l } = raw as { y: unknown; x: unknown; l: unknown };
