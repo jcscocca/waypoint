@@ -13,6 +13,7 @@ import { useCompareSet } from "../lib/useCompareSet";
 import { useDashboardData } from "../lib/useDashboardData";
 import { useDrawer } from "../lib/useDrawer";
 import { usePinDraft } from "../lib/usePinDraft";
+import { AddressLookup } from "./AddressLookup";
 import { AnalyzeTab } from "./AnalyzeTab";
 import { AssistantPanel } from "./AssistantPanel";
 import { BottomSheet } from "./BottomSheet";
@@ -25,7 +26,8 @@ import { MapLegend } from "./MapLegend";
 import { PinDraftPopover } from "./PinDraftPopover";
 import { PlaceSearch } from "./PlaceSearch";
 import { PlacesTab } from "./PlacesTab";
-import type { AnalysisSettings, AssistantDashboardState, PlaceCreate, TabKey } from "../types";
+import type { ComparePoint } from "../lib/useCompareSet";
+import type { AnalysisSettings, AssistantDashboardState, GeocodeResult, PlaceCreate, TabKey } from "../types";
 
 export function MapWorkspace() {
   const initialView = useMemo(() => {
@@ -38,6 +40,8 @@ export function MapWorkspace() {
 
   const [activeTab, setActiveTab] = useState<TabKey>(initialView?.tab ?? "places");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lookupPoint, setLookupPoint] = useState<ComparePoint | null>(null);
+  const [manualEntry, setManualEntry] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisSettings>(() => {
     if (initialView) {
       return {
@@ -58,25 +62,36 @@ export function MapWorkspace() {
   // A shared view has no persisted places to select from, so synthesize a place-shaped
   // selection from its points. This makes selected.length correct (CompareTab renders, and
   // canRun enables Run — which recomputes via the points path the hooks already receive).
-  const selected = useMemo(
-    () =>
-      sharedPoints
-        ? sharedPoints.map((point, index) => ({
-            id: `shared-${index}`,
-            display_label: point.label,
-            latitude: point.latitude,
-            longitude: point.longitude,
-            visit_count: 0,
-            total_dwell_minutes: null,
-            inferred_place_type: "shared_place",
-            sensitivity_class: "normal",
-          }))
-        : data.places.filter((place) => selectedIds.has(place.id)),
-    [sharedPoints, data.places, selectedIds],
-  );
+  const selected = useMemo(() => {
+    if (sharedPoints) {
+      return sharedPoints.map((point, index) => ({
+        id: `shared-${index}`,
+        display_label: point.label,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        visit_count: 0,
+        total_dwell_minutes: null,
+        inferred_place_type: "shared_place",
+        sensitivity_class: "normal",
+      }));
+    }
+    if (lookupPoint) {
+      return [{
+        id: "lookup-0",
+        display_label: lookupPoint.label,
+        latitude: lookupPoint.latitude,
+        longitude: lookupPoint.longitude,
+        visit_count: 0,
+        total_dwell_minutes: null,
+        inferred_place_type: "lookup_place",
+        sensitivity_class: "normal",
+      }];
+    }
+    return data.places.filter((place) => selectedIds.has(place.id));
+  }, [sharedPoints, lookupPoint, data.places, selectedIds]);
   const compareSet = useCompareSet(selected);
 
-  const analyze = useAnalyze({ selectedIds, analysis, refreshWithFallback: data.refreshWithFallback, setError: data.setError, points: sharedPoints ?? undefined });
+  const analyze = useAnalyze({ selectedIds, analysis, refreshWithFallback: data.refreshWithFallback, setError: data.setError, points: sharedPoints ?? (lookupPoint ? [lookupPoint] : undefined) });
   const compare = useCompare({ selectedIds, analysis, setError: data.setError, points: compareSet.points });
 
   // A ?view= link seeds tab/analysis/points above; run it once so the shared context
@@ -98,6 +113,7 @@ export function MapWorkspace() {
   function selectPlaceIds(ids: string[]) {
     if (ids.length === 0) return;
     invalidateAnalysisContext();
+    setLookupPoint(null);
     setSelectedIds((current) => {
       const next = new Set(current);
       ids.forEach((id) => next.add(id));
@@ -112,8 +128,27 @@ export function MapWorkspace() {
     setDrawerCollapsed,
   });
 
+  function handleLookup(result: GeocodeResult) {
+    pinDraft.previewSearch(result);
+    invalidateAnalysisContext();
+    setSelectedIds(new Set());
+    setManualEntry(false);
+    setLookupPoint({ latitude: result.latitude, longitude: result.longitude, label: result.label });
+    setActiveTab("analyze");
+  }
+
+  // Auto-run analysis for a just-looked-up address (mirrors the shared-view auto-run) so the
+  // user sees its context without a second click. Guarded on lookupPoint; the analyze hook has
+  // already re-rendered with the new points by the time this effect fires.
+  useEffect(() => {
+    if (lookupPoint) void analyze.runAnalyze();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookupPoint]);
+
   function handleToggleSelect(id: string) {
     invalidateAnalysisContext();
+    setLookupPoint(null);
+    pinDraft.setDraft(null);
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -210,6 +245,9 @@ export function MapWorkspace() {
     layer: analysis.layer,
   }), [analysis, selectedIds]);
 
+  const showLanding =
+    data.places.length === 0 && !lookupPoint && !sharedPoints && !manualEntry && activeTab === "places" && !pinDraft.draft;
+
   return (
     <div className="mc-scope">
       <div
@@ -266,13 +304,6 @@ export function MapWorkspace() {
 
         {data.error && activeTab !== "analyze" ? <p className="mc-error" role="alert">{data.error}</p> : null}
 
-        {data.places.length === 0 && !pinDraft.draft ? (
-          <div className="mc-empty">
-            <h3>Map your places</h3>
-            <p>Choose <strong>Add pin</strong> then click the map, or search for an address in the Places tab.</p>
-          </div>
-        ) : null}
-
         {sharedPoints ? (
           <div className="mc-banner" role="status">
             Shared view · reported incident context.{" "}
@@ -296,6 +327,10 @@ export function MapWorkspace() {
           onPreset={onPreset}
           tabBadges={{ places: data.places.length, compare: compareSet.points.length }}
         >
+          {showLanding ? (
+            <AddressLookup provider={geocodingProvider} onSelect={handleLookup} onManual={() => setManualEntry(true)} />
+          ) : (
+            <>
           {activeTab === "places" ? (
             <PlacesTab
               places={data.places}
@@ -351,6 +386,8 @@ export function MapWorkspace() {
             />
           ) : null}
           {activeTab === "export" ? <ExportTab href={data.exportHref} /> : null}
+            </>
+          )}
         </BottomSheet>
       </div>
     </div>

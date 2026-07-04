@@ -29,6 +29,12 @@ vi.mock("../api/client", () => ({
   streamAssistantChat: vi.fn(),
 }));
 
+const geocodeSearch = vi.hoisted(() => vi.fn());
+vi.mock("../lib/geocoding", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/geocoding")>()),
+  geocodingProvider: { search: geocodeSearch },
+}));
+
 import { MapWorkspace } from "./MapWorkspace";
 import { analyzePlaces, comparePlaces, createBulkPlaces, createPlace, createSession, getDashboardSummary, getIncidentDetails, getNeighborhoodAnalysis, streamAssistantChat } from "../api/client";
 import { currentYearAnalysisWindow } from "../lib/analysisDefaults";
@@ -125,7 +131,7 @@ describe("MapWorkspace", () => {
     vi.mocked(createPlace).mockResolvedValue(home);
 
     render(<MapWorkspace />);
-    await screen.findByText(/Map your places/i);
+    await screen.findByRole("heading", { name: /look up an address/i });
 
     fireEvent.click(screen.getByRole("button", { name: /add pin/i }));
     fireEvent.click(screen.getByTestId("fire-map-click"));
@@ -152,7 +158,7 @@ describe("MapWorkspace", () => {
     vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 1 });
 
     render(<MapWorkspace />);
-    await screen.findByText(/Map your places/i);
+    await screen.findByRole("heading", { name: /look up an address/i });
 
     fireEvent.click(screen.getByRole("button", { name: /add pin/i }));
     fireEvent.click(screen.getByTestId("fire-map-click"));
@@ -186,8 +192,9 @@ describe("MapWorkspace", () => {
     vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 2 });
 
     render(<MapWorkspace />);
-    await screen.findByText(/Map your places/i);
+    await screen.findByRole("heading", { name: /look up an address/i });
 
+    fireEvent.click(screen.getByRole("button", { name: /add places manually/i }));
     fireEvent.click(screen.getByRole("button", { name: "Import" }));
     fireEvent.change(screen.getByLabelText("CSV rows"), {
       target: { value: "display_label,latitude,longitude\nHome,47.61,-122.33\nWork,47.62,-122.34" },
@@ -217,7 +224,7 @@ describe("MapWorkspace", () => {
     vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary());
 
     const { container } = render(<MapWorkspace />);
-    await screen.findByText(/Map your places/i);
+    await screen.findByRole("heading", { name: /look up an address/i });
 
     fireEvent.click(screen.getByRole("button", { name: /add pin/i }));
 
@@ -440,5 +447,38 @@ describe("MapWorkspace", () => {
     // The shared Compare pane renders its verdict (synthetic selection ≥ 2).
     expect(await screen.findByTestId("compare-ranked")).toBeInTheDocument();
     window.history.replaceState({}, "", "/");
+  });
+
+  it("leads a fresh session with the look-up landing", async () => {
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary());
+    render(<MapWorkspace />);
+    expect(await screen.findByRole("heading", { name: /look up an address/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Map your places/i)).not.toBeInTheDocument();
+  });
+
+  it("looks up an address and analyzes it via the points path without saving a place", async () => {
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary());
+    vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 1 });
+    vi.mocked(getIncidentDetails).mockResolvedValue(makeIncidentDetails());
+    vi.mocked(getNeighborhoodAnalysis).mockResolvedValue(makeNeighborhoodAnalysis());
+    geocodeSearch.mockResolvedValue([{ label: "123 Main St", latitude: 47.61, longitude: -122.34, source: "test" }]);
+
+    render(<MapWorkspace />);
+    await screen.findByRole("heading", { name: /look up an address/i });
+    fireEvent.change(screen.getByLabelText(/search an address/i), { target: { value: "123 Main" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByText("123 Main St"));
+
+    await waitFor(() => {
+      expect(analyzePlaces).toHaveBeenCalledWith(expect.objectContaining({
+        points: [{ latitude: 47.61, longitude: -122.34, label: "123 Main St" }],
+        radii_m: [250],
+        layer: "reported",
+      }));
+    });
+    expect(createPlace).not.toHaveBeenCalled();
+    expect(await screen.findByText("100 BLOCK MAIN ST")).toBeInTheDocument();
   });
 });
