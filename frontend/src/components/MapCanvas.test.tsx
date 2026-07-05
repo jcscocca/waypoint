@@ -323,9 +323,9 @@ describe("beat + incident layers", () => {
     });
     const card = document.body.querySelector(".mc-incident-card");
     expect(card).not.toBeNull();
-    expect(card!.textContent).toContain('<img src=x onerror="a">'); // rendered as TEXT
+    expect(card!.textContent).toContain('<img'); // title-cased but rendered as TEXT, tag intact
     expect(card!.querySelector("img")).toBeNull(); // never parsed as HTML
-    expect(card!.textContent).toContain("1XX BLOCK OF PINE ST");
+    expect(card!.textContent).toContain("100 block of Pine St"); // formatted via formatIncidentAddress
   });
 
   it("emits viewport bounds on moveend and once after load", async () => {

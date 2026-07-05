@@ -2,6 +2,7 @@ import maplibregl from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { formatIncidentAddress, titleCase } from "../lib/addressLabel";
 import { circlePolygonCoords } from "../lib/geodesy";
 import { incidentCountForPlace } from "../lib/incidentSummaries";
 import { buildMapStyle, cartoRasterStyle, fallbackMapStyle, TILES_URL } from "../lib/mapStyle";
@@ -211,11 +212,12 @@ function incidentCardElement(props: Record<string, unknown>): HTMLElement {
   const card = document.createElement("div");
   card.className = "mc-incident-card";
   const title = document.createElement("strong");
-  title.textContent = String(props.offense_subcategory ?? props.offense_category ?? "Incident");
+  const rawTitle = props.offense_subcategory ?? props.offense_category;
+  title.textContent = rawTitle ? titleCase(String(rawTitle)) : "Incident";
   const when = document.createElement("div");
   when.textContent = props.occurred_at ? String(props.occurred_at).slice(0, 10) : "date not recorded";
   const where = document.createElement("div");
-  where.textContent = String(props.block_address ?? "");
+  where.textContent = formatIncidentAddress(props.block_address as string | null | undefined);
   card.append(title, when, where);
   return card;
 }
@@ -236,9 +238,9 @@ type Props = {
   summary: DashboardSummary | null;
   radiusM: number;
   flyTo: LatLng | null;
-  beats?: BeatFeatureCollection | null;
-  highlightBeats?: string[];
-  incidentPoints?: IncidentFeatureCollection | null;
+  beats: BeatFeatureCollection | null;
+  highlightBeats: string[];
+  incidentPoints: IncidentFeatureCollection | null;
   onViewportChange?: (bounds: MapBounds) => void;
   onMapClick: (latlng: LatLng) => void;
   onMarkerClick: (placeId: string) => void;
@@ -252,9 +254,9 @@ export function MapCanvas({
   summary,
   radiusM,
   flyTo,
-  beats = null,
-  highlightBeats = [],
-  incidentPoints = null,
+  beats,
+  highlightBeats,
+  incidentPoints,
   onViewportChange,
   onMapClick,
   onMarkerClick,
@@ -334,7 +336,7 @@ export function MapCanvas({
         if (clusterId === undefined || !source) return;
         source.getClusterExpansionZoom(clusterId).then((zoom) => {
           map.easeTo({ center: (feature!.geometry as GeoJSON.Point).coordinates as [number, number], zoom });
-        });
+        }).catch(() => {});
       });
       for (const hoverable of ["mc-incident-dot", "mc-incident-cluster"]) {
         map.on("mouseenter", hoverable, () => { map.getCanvas().style.cursor = "pointer"; });
