@@ -809,8 +809,7 @@ CSS (replace the `.mc-controls`/`.mc-actionrow`/`.mc-addpin` region; keep `.mc-h
   background:var(--surface);border:1px solid var(--border);box-shadow:0 10px 26px -14px rgba(16,24,32,.3);color:var(--text-dim);}
 .mc-searchpill-row input{border:0;background:transparent;outline:none;width:100%;font-family:var(--f-ui);font-size:14px;color:var(--text-strong);}
 .mc-searchpill-row input::placeholder{color:var(--text-dim);}
-.mc-searchpill-pin{display:grid;place-items:center;width:34px;height:34px;border-radius:999px;border:0;cursor:pointer;color:#fff;background:var(--accent);}
-[data-theme="dark"] .mc-scope .mc-searchpill-pin{color:#0B1218;}
+.mc-searchpill-pin{display:grid;place-items:center;width:34px;height:34px;border-radius:999px;border:0;cursor:pointer;color:var(--on-accent);background:var(--accent);}
 .mc-searchpill-pin.is-armed{box-shadow:0 0 0 4px var(--accent-soft);animation:armpulse 2.4s ease-in-out infinite;}
 .mc-searchpill-results{list-style:none;margin:0;padding:6px;display:grid;gap:2px;max-height:240px;overflow:auto;
   background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 14px 30px -16px rgba(16,24,32,.35);}
@@ -959,8 +958,7 @@ CSS: delete the `.mc-assistant{position:absolute;left:22px;bottom:22px;…}` blo
 .mc-dock-collapse{display:grid;place-items:center;width:26px;height:26px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;}
 .mc-dock-log{display:grid;gap:7px;max-height:200px;overflow:auto;}
 .mc-dock-msg{margin:0;padding:8px 10px;border-radius:10px;font-size:12.5px;line-height:1.45;overflow-wrap:anywhere;}
-.mc-dock-msg.is-user{margin-left:34px;color:#fff;background:var(--accent);}
-[data-theme="dark"] .mc-scope .mc-dock-msg.is-user{color:#0B1218;}
+.mc-dock-msg.is-user{margin-left:34px;color:var(--on-accent);background:var(--accent);}
 .mc-dock-msg.is-assistant{margin-right:22px;color:var(--text-strong);background:var(--surface-sunken);border:1px solid var(--border);}
 .mc-dock-empty{display:grid;gap:9px;}
 .mc-dock-empty p{margin:0;color:var(--text-dim);font-size:12.5px;}
@@ -970,8 +968,7 @@ CSS: delete the `.mc-assistant{position:absolute;left:22px;bottom:22px;…}` blo
 .mc-dock-error{margin:0;color:var(--danger);font-size:12px;font-weight:650;}
 .mc-dock-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;}
 .mc-dock-form textarea{min-height:42px;max-height:84px;resize:vertical;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text-strong);font-family:var(--f-ui);font-size:12.5px;padding:9px 10px;}
-.mc-dock-form button{height:42px;padding:0 13px;border:0;border-radius:10px;cursor:pointer;color:#fff;background:var(--accent);font-size:12.5px;font-weight:700;}
-[data-theme="dark"] .mc-scope .mc-dock-form button{color:#0B1218;}
+.mc-dock-form button{height:42px;padding:0 13px;border:0;border-radius:10px;cursor:pointer;color:var(--on-accent);background:var(--accent);font-size:12.5px;font-weight:700;}
 ```
 
 (Delete the old `.mc-assistant-*` rule set entirely.)
