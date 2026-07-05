@@ -217,6 +217,8 @@ export function MapCanvas({
 
   useEffect(() => {
     const map = mapRef.current;
+    // Markers only need the Map instance, but they share the rings' mapReady gate so a
+    // single state drives both effects; accepted trade-off — pins wait for style load.
     if (!map || !mapReady) return;
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];

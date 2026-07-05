@@ -58,9 +58,15 @@ try {
 #     A failure here is non-fatal — the app runs with a flat-background map fallback.
 $tiles = Join-Path $repo 'app\data\tiles\seattle.pmtiles'
 if (-not (Test-Path $tiles) -or -not (Test-Path (Join-Path $repo 'frontend\public\basemaps-assets'))) {
-    Write-Host 'Basemap tiles missing; fetching (one-time, ~100 MB)...'
+    Write-Host 'Basemap artifacts missing; fetching (one-time, ~100 MB)...'
     python (Join-Path $repo 'scripts\fetch_tiles.py')
-    if ($LASTEXITCODE -ne 0) { Write-Host 'WARNING: tile fetch failed; map will use the fallback background.' }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host 'WARNING: tile fetch failed; map will use the fallback background.'
+    } else {
+        # The image bakes basemaps-assets at build time, so a fresh fetch must force a
+        # rebuild even when HEAD did not move (first run after the map-overhaul merge).
+        $doBuild = $true
+    }
 }
 
 # 1. Docker engine. Docker Desktop starts at login, but the engine takes a moment;

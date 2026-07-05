@@ -112,7 +112,9 @@ Frontend map layers:
   defaults to `prefers-color-scheme`, persists explicit choice in localStorage, and swaps
   the map style JSON in sync. Fold the legacy Inter `:root` scope (`styles.css`) into the
   one theme system. Type: Archivo for UI, IBM Plex Mono for figures; Fraunces (display
-  serif) is dropped.
+  serif) is dropped. Self-host the webfonts while at it: `frontend/index.html` still loads
+  them from Google Fonts — the app's last external request (user IP + referrer leak),
+  found during slice 1's live network audit.
 - Behavior-preserving against the existing MapWorkspace/hook tests (updated for the new
   structure); per-tab hooks are untouched.
 
