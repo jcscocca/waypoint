@@ -7,6 +7,10 @@ import {
   TILES_URL,
 } from "./mapStyle";
 
+// Privacy guard matcher: catches absolute (http/https), protocol-relative (//host),
+// and non-http-scheme (ws://, wss://, ftp://) URLs in the serialized style.
+const URL_PATTERN = /(?:[a-z+]+:)?\/\/[^"]+/g;
+
 describe("buildMapStyle", () => {
   it("points the vector source at the self-hosted PMTiles file via the pmtiles protocol", () => {
     const style = buildMapStyle("light", "http://localhost:8000");
@@ -16,14 +20,28 @@ describe("buildMapStyle", () => {
   });
 
   it("self-hosts glyphs and sprites (no external hosts)", () => {
-    const style = buildMapStyle("dark", "http://localhost:8000");
-    expect(style.glyphs).toBe("http://localhost:8000/basemaps-assets/fonts/{fontstack}/{range}.pbf");
-    expect(String(style.sprite)).toContain("http://localhost:8000/basemaps-assets/sprites/");
-    const externals = JSON.stringify(style).match(/https?:\/\/(?!localhost:8000)[^"]+/g) ?? [];
-    // Attribution links are the only allowed external URLs.
-    for (const url of externals) {
-      expect(url).toMatch(/openstreetmap\.org|protomaps\.com/);
+    const origin = "http://localhost:8000";
+    const style = buildMapStyle("dark", origin);
+    expect(style.glyphs).toBe(`${origin}/basemaps-assets/fonts/{fontstack}/{range}.pbf`);
+    expect(String(style.sprite)).toBe(`${origin}/basemaps-assets/sprites/v4/dark`);
+    const urls = JSON.stringify(style).match(URL_PATTERN) ?? [];
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) {
+      // pmtiles:// wraps a same-origin http URL; unwrap before the origin check.
+      const target = url.replace(/^pmtiles:\/\//, "");
+      const allowed =
+        target.startsWith(`${origin}/`) ||
+        // Attribution links are the only allowed external URLs.
+        /openstreetmap\.org|protomaps\.com/.test(url);
+      expect(allowed, `unexpected external URL: ${url}`).toBe(true);
     }
+  });
+
+  it("catches protocol-relative and non-http-scheme URLs (guard self-test)", () => {
+    const fixture = '{"sprite":"//x.example/sprite","socket":"wss://x.example/live"}';
+    const matches = fixture.match(URL_PATTERN) ?? [];
+    expect(matches).toContain("//x.example/sprite");
+    expect(matches).toContain("wss://x.example/live");
   });
 
   it("produces a non-empty basemap layer list for both themes", () => {

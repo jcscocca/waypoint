@@ -38,6 +38,7 @@ export function buildMapStyle(theme: MapTheme, origin: string): StyleSpecificati
   return {
     version: 8,
     glyphs: `${origin}/basemaps-assets/fonts/{fontstack}/{range}.pbf`,
+    // v4 tracks the @protomaps/basemaps sprite schema version; keep in sync when bumping the dep.
     sprite: `${origin}/basemaps-assets/sprites/v4/${theme}`,
     sources: {
       protomaps: {
