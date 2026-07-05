@@ -13,6 +13,9 @@ DashboardRadiusMeters = Annotated[int, Field(gt=0, le=5000)]
 # frontend SEATTLE_BBOX. A shared-view point must resolve inside Seattle.
 _SEATTLE_WEST, _SEATTLE_EAST = -122.55, -122.10
 _SEATTLE_SOUTH, _SEATTLE_NORTH = 47.43, 47.78
+# Public aliases so services can clamp to the same bounds without a private-member import.
+SEATTLE_WEST, SEATTLE_EAST = _SEATTLE_WEST, _SEATTLE_EAST
+SEATTLE_SOUTH, SEATTLE_NORTH = _SEATTLE_SOUTH, _SEATTLE_NORTH
 _MAX_POINTS = 10
 
 
@@ -67,10 +70,10 @@ class DashboardIncidentPointsRequest(BaseModel):
     nibrs_group: str | None = None
     layer: str = LAYER_REPORTED
 
-    @model_validator(mode="after")
-    def layer_must_be_known(self) -> DashboardIncidentPointsRequest:
-        _validate_layer(self.layer)
-        return self
+    @field_validator("layer")
+    @classmethod
+    def layer_must_be_known(cls, value: str) -> str:
+        return _validate_layer(value)
 
 
 class DashboardAnalyzeRequest(BaseModel):

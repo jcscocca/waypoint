@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from pydantic import ValidationError
 
 from app.api.dashboard_schemas import DashboardIncidentPointsRequest, MapBounds
+from app.db import configure_database, get_sessionmaker, init_db
+from app.models import CrimeIncident
+from app.services.incident_points_service import INCIDENT_POINTS_LIMIT, incident_points
 
 
 def _payload(**over):
@@ -42,3 +45,114 @@ def test_bbox_overlapping_seattle_accepted_and_wider_than_city_ok() -> None:
 def test_unknown_layer_rejected() -> None:
     with pytest.raises(ValidationError, match="layer must be one of"):
         DashboardIncidentPointsRequest(**_payload(layer="everything"))
+
+
+def _session(tmp_path):
+    configure_database(f"sqlite+pysqlite:///{tmp_path / 'points.sqlite3'}")
+    init_db()
+    return get_sessionmaker()()
+
+
+def _incident(i: int, **over) -> CrimeIncident:
+    fields = {
+        "id": f"inc-{i}",
+        "external_incident_id": f"ext-{i}",
+        "offense_start_utc": datetime(2025, 6, 1, 12, 0, tzinfo=UTC),
+        "offense_category": "PROPERTY",
+        "offense_subcategory": "THEFT",
+        "block_address": f"{i}XX BLOCK OF PINE ST",
+        "latitude": 47.610,
+        "longitude": -122.330,
+        "source_dataset": "seattle_spd_crime",
+    }
+    fields.update(over)
+    return CrimeIncident(**fields)
+
+
+BOUNDS = {"west": -122.40, "south": 47.55, "east": -122.25, "north": 47.65}
+DATES = {"analysis_start_date": date(2025, 1, 1), "analysis_end_date": date(2025, 10, 31)}
+
+
+def test_points_filtered_by_bbox_dates_and_layer(tmp_path) -> None:
+    session = _session(tmp_path)
+    session.add_all(
+        [
+            _incident(1),  # in bbox, in range, reported → returned
+            _incident(2, latitude=47.70, longitude=-122.33),  # north of bbox → out
+            _incident(3, offense_start_utc=datetime(2024, 1, 1, tzinfo=UTC)),  # out of range
+            _incident(4, source_dataset="seattle_spd_arrests"),  # wrong layer
+            _incident(5, latitude=None, longitude=None),  # redacted → unmappable
+        ]
+    )
+    session.commit()
+    result = incident_points(session, bounds=MapBounds(**BOUNDS), layer="reported", **DATES)
+    assert result["returned_count"] == 1
+    assert result["total_count"] == 1
+    assert result["unmappable_count"] == 1
+    point = result["points"][0]
+    assert point["id"] == "inc-1"
+    assert point["latitude"] == 47.610
+    assert point["block_address"] == "1XX BLOCK OF PINE ST"
+    assert point["occurred_at"].endswith("Z")
+    session.close()
+
+
+def test_arrest_sentinel_never_appears_even_with_huge_bbox(tmp_path) -> None:
+    # Arrests with unknown location use -1.0/-1.0; the Seattle clamp excludes them
+    # structurally. Pin the behavior so a future bbox change can't regress it.
+    session = _session(tmp_path)
+    session.add_all(
+        [
+            _incident(1, source_dataset="seattle_spd_arrests"),
+            _incident(2, source_dataset="seattle_spd_arrests", latitude=-1.0, longitude=-1.0),
+        ]
+    )
+    session.commit()
+    result = incident_points(
+        session,
+        bounds=MapBounds(west=-123.0, south=47.0, east=-122.0, north=48.0),
+        layer="arrests",
+        **DATES,
+    )
+    assert result["returned_count"] == 1
+    assert result["points"][0]["id"] == "inc-1"
+    session.close()
+
+
+def test_cap_returns_most_recent_and_signals_truncation(tmp_path) -> None:
+    session = _session(tmp_path)
+    session.add_all(
+        [
+            _incident(i, offense_start_utc=datetime(2025, 6, 1 + i, 12, 0, tzinfo=UTC))
+            for i in range(4)
+        ]
+    )
+    session.commit()
+    result = incident_points(
+        session, bounds=MapBounds(**BOUNDS), layer="reported", limit=2, **DATES
+    )
+    assert result["returned_count"] == 2
+    assert result["total_count"] == 4
+    assert result["limit"] == 2
+    # Most recent first
+    assert [p["id"] for p in result["points"]] == ["inc-3", "inc-2"]
+    session.close()
+
+
+def test_reversed_dates_raise_value_error(tmp_path) -> None:
+    # AMENDMENT 1: mirror the sibling endpoints — reversed dates must 400 at the route,
+    # which means ValueError here, not a silent empty result.
+    session = _session(tmp_path)
+    with pytest.raises(ValueError, match="analysis_start_date"):
+        incident_points(
+            session,
+            bounds=MapBounds(**BOUNDS),
+            layer="reported",
+            analysis_start_date=date(2025, 10, 31),
+            analysis_end_date=date(2025, 1, 1),
+        )
+    session.close()
+
+
+def test_default_limit_is_5000() -> None:
+    assert INCIDENT_POINTS_LIMIT == 5000
