@@ -71,3 +71,22 @@ def test_assistant_global_daily_cap(tmp_path, monkeypatch) -> None:
     assert response.status_code == 429
     detail = response.json()["detail"].lower()
     assert "analyst" in detail and ("limit" in detail or "capacity" in detail)
+
+
+def test_burst_limit_on_api_routes(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("MCA_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("MCA_RATE_LIMIT_BURST_PER_MINUTE", "5")
+    app = create_app(f"sqlite+pysqlite:///{tmp_path}/rl5.sqlite3")
+    client = TestClient(app)
+    statuses = [client.get("/input-modes").status_code for _ in range(7)]
+    assert statuses[:5] == [200] * 5
+    assert 429 in statuses[5:]
+
+
+def test_burst_limit_exempts_health(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("MCA_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("MCA_RATE_LIMIT_BURST_PER_MINUTE", "1")
+    app = create_app(f"sqlite+pysqlite:///{tmp_path}/rl6.sqlite3")
+    client = TestClient(app)
+    for _ in range(5):
+        assert client.get("/health").status_code == 200
