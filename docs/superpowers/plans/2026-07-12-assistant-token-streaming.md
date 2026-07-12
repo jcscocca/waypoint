@@ -59,7 +59,7 @@ cd /Users/jscocca/Repos/waypoint-assistant-streaming
 grep -q "^.venv$" /Users/jscocca/Repos/waypoint/.git/info/exclude || printf ".venv\nfrontend/node_modules\n" >> /Users/jscocca/Repos/waypoint/.git/info/exclude
 ```
 
-- [ ] **Step 0.2: Verify the test suite runs from the worktree**
+- [x] **Step 0.2: Verify the test suite runs from the worktree**
 
 Run: `.venv/bin/python -m pytest tests/test_assistant_agent.py -q`
 Expected: all pass (baseline green before any change).
@@ -74,7 +74,7 @@ Expected: all pass (baseline green before any change).
 - Modify: `docker-compose.yml` (env block, after `MCA_LLM_FALLBACK_API_KEY` at line 50)
 - Test: `tests/test_assistant_agent.py` (schema assertion added in Task 6; this task only needs the compile-level change verified by the suite)
 
-- [ ] **Step 1.1: Add the settings field**
+- [x] **Step 1.1: Add the settings field**
 
 In `app/config.py`, directly under `assistant_role: str = "waypoint_analyst"` (line 37):
 
@@ -85,7 +85,7 @@ In `app/config.py`, directly under `assistant_role: str = "waypoint_analyst"` (l
     assistant_narration_enabled: bool = True
 ```
 
-- [ ] **Step 1.2: Extend the event Literal**
+- [x] **Step 1.2: Extend the event Literal**
 
 In `app/assistant/schemas.py`, change:
 
@@ -103,7 +103,7 @@ class AssistantStreamEvent(BaseModel):
     data: dict[str, Any]
 ```
 
-- [ ] **Step 1.3: Pass the env var through the compose allowlist**
+- [x] **Step 1.3: Pass the env var through the compose allowlist**
 
 In `docker-compose.yml`, after the `MCA_LLM_FALLBACK_API_KEY` line (line 50), add:
 
@@ -113,12 +113,12 @@ In `docker-compose.yml`, after the `MCA_LLM_FALLBACK_API_KEY` line (line 50), ad
 
 (The deploy env-allowlist gotcha: compose passes only listed vars — a missing entry means the ThinkPad deploy silently ignores `.env.deploy`.)
 
-- [ ] **Step 1.4: Run the backend suite to confirm nothing broke**
+- [x] **Step 1.4: Run the backend suite to confirm nothing broke**
 
 Run: `.venv/bin/python -m pytest tests/test_assistant_agent.py tests/test_assistant_api.py -q`
 Expected: PASS (additive changes only).
 
-- [ ] **Step 1.5: Commit**
+- [x] **Step 1.5: Commit**
 
 ```bash
 git add app/config.py app/assistant/schemas.py docker-compose.yml
@@ -135,7 +135,7 @@ git commit -m "feat(assistant): narration kill-switch setting + status/replace S
 
 Contract (load-bearing for Task 3): `stream()` raises `LlmUnavailable` **only before the first delta** (connect error, HTTP error, empty stream). Any failure after the first delta raises `LlmStreamInterrupted` — the failover client must never switch endpoints mid-stream (tokens can't be unsaid).
 
-- [ ] **Step 2.1: Write the failing tests**
+- [x] **Step 2.1: Write the failing tests**
 
 Append to `tests/test_openai_llm_client.py` (reuses `_DUMMY_REQUEST`, `_make_client` from the top of the file):
 
@@ -274,12 +274,12 @@ def test_stream_sets_stream_true_and_merges_extra_body(monkeypatch: pytest.Monke
     assert captured["chat_template_kwargs"] == {"enable_thinking": False}
 ```
 
-- [ ] **Step 2.2: Run to verify failure**
+- [x] **Step 2.2: Run to verify failure**
 
 Run: `.venv/bin/python -m pytest tests/test_openai_llm_client.py -q`
 Expected: new tests FAIL with `AttributeError: ... no attribute 'stream'` / ImportError for `LlmStreamInterrupted`; old tests pass.
 
-- [ ] **Step 2.3: Implement**
+- [x] **Step 2.3: Implement**
 
 In `app/assistant/llm_client.py`: add imports `import json` and `from collections.abc import AsyncIterator` at the top. After `class LlmUnavailable(RuntimeError)`, add:
 
@@ -378,12 +378,12 @@ Add to `OpenAiLlmClient` (below `complete`):
             )
 ```
 
-- [ ] **Step 2.4: Run to verify pass**
+- [x] **Step 2.4: Run to verify pass**
 
 Run: `.venv/bin/python -m pytest tests/test_openai_llm_client.py -q`
 Expected: PASS.
 
-- [ ] **Step 2.5: Commit**
+- [x] **Step 2.5: Commit**
 
 ```bash
 git add app/assistant/llm_client.py tests/test_openai_llm_client.py
@@ -398,7 +398,7 @@ git commit -m "feat(assistant): streaming completions on OpenAiLlmClient with mi
 - Modify: `app/assistant/llm_client.py` (FailoverLlmClient)
 - Test: `tests/test_failover_llm_client.py`
 
-- [ ] **Step 3.1: Write the failing tests**
+- [x] **Step 3.1: Write the failing tests**
 
 Append to `tests/test_failover_llm_client.py`. Check the file's existing imports first — it already imports `FailoverLlmClient` and `LlmUnavailable`; add `LlmStreamInterrupted` to that import. Use these fakes (self-contained, do not depend on other fixtures in the file):
 
@@ -474,12 +474,12 @@ def test_stream_mid_stream_interrupt_propagates_without_failover() -> None:
     assert fallback.stream_called == 0
 ```
 
-- [ ] **Step 3.2: Run to verify failure**
+- [x] **Step 3.2: Run to verify failure**
 
 Run: `.venv/bin/python -m pytest tests/test_failover_llm_client.py -q`
 Expected: new tests FAIL (`FailoverLlmClient` has no `stream`); existing tests pass.
 
-- [ ] **Step 3.3: Implement**
+- [x] **Step 3.3: Implement**
 
 Add to `FailoverLlmClient` (below `complete`); mirrors `complete`'s failure bookkeeping:
 
@@ -525,12 +525,12 @@ Add to `FailoverLlmClient` (below `complete`); mirrors `complete`'s failure book
         ) from last_exc
 ```
 
-- [ ] **Step 3.4: Run to verify pass**
+- [x] **Step 3.4: Run to verify pass**
 
 Run: `.venv/bin/python -m pytest tests/test_failover_llm_client.py -q`
 Expected: PASS.
 
-- [ ] **Step 3.5: Commit**
+- [x] **Step 3.5: Commit**
 
 ```bash
 git add app/assistant/llm_client.py tests/test_failover_llm_client.py
@@ -547,7 +547,7 @@ git commit -m "feat(assistant): streaming failover — switch endpoints only bef
 
 The module is generic: it takes the delta iterator and a `check` callable (full accumulated text → redirect string or `None`). No imports from `agent.py` (agent imports guard, never the reverse).
 
-- [ ] **Step 4.1: Write the failing tests**
+- [x] **Step 4.1: Write the failing tests**
 
 Create `tests/test_stream_guard.py`:
 
@@ -658,12 +658,12 @@ def test_trip_on_final_scan_before_tail_flush() -> None:
     asyncio.run(run())
 ```
 
-- [ ] **Step 4.2: Run to verify failure**
+- [x] **Step 4.2: Run to verify failure**
 
 Run: `.venv/bin/python -m pytest tests/test_stream_guard.py -q`
 Expected: FAIL with `ModuleNotFoundError: app.assistant.stream_guard`.
 
-- [ ] **Step 4.3: Implement**
+- [x] **Step 4.3: Implement**
 
 Create `app/assistant/stream_guard.py`:
 
@@ -723,12 +723,12 @@ def _release_boundary(text: str) -> int:
     return starts[len(starts) - HOLDBACK_WORDS]
 ```
 
-- [ ] **Step 4.4: Run to verify pass**
+- [x] **Step 4.4: Run to verify pass**
 
 Run: `.venv/bin/python -m pytest tests/test_stream_guard.py -q`
 Expected: PASS.
 
-- [ ] **Step 4.5: Commit**
+- [x] **Step 4.5: Commit**
 
 ```bash
 git add app/assistant/stream_guard.py tests/test_stream_guard.py
@@ -745,7 +745,7 @@ git commit -m "feat(assistant): holdback stream guard — full-text scan per del
 
 The narration prompt deliberately repeats the invariant rules rather than sharing a constant with `PLANNING_SYSTEM_PROMPT` — the planning literal stays byte-identical so planning reliability on gemma is untouched (spec: "deliberately deferred").
 
-- [ ] **Step 5.1: Write the failing tests**
+- [x] **Step 5.1: Write the failing tests**
 
 Append to `tests/test_assistant_agent.py`:
 
@@ -794,12 +794,12 @@ def test_build_narration_messages_shape():
     assert "ONLY" in built[-1]["content"]
 ```
 
-- [ ] **Step 5.2: Run to verify failure**
+- [x] **Step 5.2: Run to verify failure**
 
 Run: `.venv/bin/python -m pytest tests/test_assistant_agent.py -q -k "grounding or narration_messages"`
 Expected: FAIL with ImportError.
 
-- [ ] **Step 5.3: Implement**
+- [x] **Step 5.3: Implement**
 
 Append to `app/assistant/prompts.py`:
 
@@ -858,12 +858,12 @@ def build_narration_messages(
     ]
 ```
 
-- [ ] **Step 5.4: Run to verify pass**
+- [x] **Step 5.4: Run to verify pass**
 
 Run: `.venv/bin/python -m pytest tests/test_assistant_agent.py -q -k "grounding or narration_messages"`
 Expected: PASS.
 
-- [ ] **Step 5.5: Commit**
+- [x] **Step 5.5: Commit**
 
 ```bash
 git add app/assistant/prompts.py tests/test_assistant_agent.py
@@ -880,7 +880,7 @@ git commit -m "feat(assistant): Copper narration prompt + grounding builders"
 
 This is the core task. The kill switch gates **all** new behavior (status events AND narration): off = byte-for-byte today's event sequences.
 
-- [ ] **Step 6.1: Add the autouse kill-switch fixture**
+- [x] **Step 6.1: Add the autouse kill-switch fixture**
 
 Only `tests/test_assistant_agent.py` needs it — `tests/test_assistant_api.py` stubs `run_assistant_turn` itself and never executes agent code. At the top of `tests/test_assistant_agent.py` (after imports; also add `import pytest` if absent):
 
@@ -896,7 +896,7 @@ def _narration_off(monkeypatch: pytest.MonkeyPatch):
 Run: `.venv/bin/python -m pytest tests/test_assistant_agent.py -q`
 Expected: PASS (flag doesn't exist in agent code yet, fixture is inert — this pins the baseline).
 
-- [ ] **Step 6.2: Write the failing narration-mode tests**
+- [x] **Step 6.2: Write the failing narration-mode tests**
 
 Append to `tests/test_assistant_agent.py`:
 
@@ -1171,12 +1171,12 @@ def test_kill_switch_preserves_todays_exact_sequence(tmp_path):
     assert client.stream_calls == []
 ```
 
-- [ ] **Step 6.3: Run to verify failure**
+- [x] **Step 6.3: Run to verify failure**
 
 Run: `.venv/bin/python -m pytest tests/test_assistant_agent.py -q -k "narration or kill_switch or status_events"`
 Expected: new tests FAIL (no status events, single token, no replace); baseline tests still pass.
 
-- [ ] **Step 6.4: Implement in `app/assistant/agent.py`**
+- [x] **Step 6.4: Implement in `app/assistant/agent.py`**
 
 Add imports (top of file):
 
@@ -1331,12 +1331,12 @@ Replace the final-message block (currently lines 212-225) with:
         yield event
 ```
 
-- [ ] **Step 6.5: Run the agent suites**
+- [x] **Step 6.5: Run the agent suites**
 
 Run: `.venv/bin/python -m pytest tests/test_assistant_agent.py tests/test_assistant_api.py -q`
 Expected: PASS (both kill-switch baseline and narration-mode tests).
 
-- [ ] **Step 6.6: Add one API-level SSE serialization test**
+- [x] **Step 6.6: Add one API-level SSE serialization test**
 
 Append to `tests/test_assistant_api.py`, following the file's existing `test_assistant_chat_streams_agent_events` pattern (stub `run_assistant_turn` on the routes module — the point is that the route and `_sse_event` pass the new event names through unmodified):
 
@@ -1371,12 +1371,12 @@ def test_assistant_chat_serializes_status_and_replace_events(monkeypatch, tmp_pa
     assert "event: done" in response.text
 ```
 
-- [ ] **Step 6.7: Run to verify pass, then the full backend gate**
+- [x] **Step 6.7: Run to verify pass, then the full backend gate**
 
 Run: `.venv/bin/python -m pytest tests/test_assistant_api.py -q` then `.venv/bin/python -m pytest -q` and `.venv/bin/ruff check .`
 Expected: all PASS. If unrelated agent tests fail on the new `status` events, they are missing the autouse fixture — fix by confirming Step 6.1 landed in that file, not by editing assertions.
 
-- [ ] **Step 6.8: Commit**
+- [x] **Step 6.8: Commit**
 
 ```bash
 git add app/assistant/agent.py tests/test_assistant_agent.py tests/test_assistant_api.py
@@ -1393,7 +1393,7 @@ git commit -m "feat(assistant): streamed Copper finals with holdback guard, stat
 - Modify: `frontend/src/styles/mapWorkspace.css` (near `.mc-dock-log`, line ~107)
 - Test: `frontend/src/components/AssistantPanel.test.tsx`
 
-- [ ] **Step 7.1: Write the failing tests**
+- [x] **Step 7.1: Write the failing tests**
 
 Append inside the `describe("AssistantPanel", ...)` block of `AssistantPanel.test.tsx` (the `sseResponse` helper and `dashboardState` fixture already exist at the top of the file):
 
@@ -1435,12 +1435,12 @@ Append inside the `describe("AssistantPanel", ...)` block of `AssistantPanel.tes
   });
 ```
 
-- [ ] **Step 7.2: Run to verify failure**
+- [x] **Step 7.2: Run to verify failure**
 
 Run: `cd frontend && npx vitest run src/components/AssistantPanel.test.tsx`
 Expected: the two new tests FAIL (status text handled as unknown event / replace ignored so partial text persists).
 
-- [ ] **Step 7.3: Implement**
+- [x] **Step 7.3: Implement**
 
 `frontend/src/types.ts` — extend the union:
 
@@ -1496,17 +1496,17 @@ In the render, the draft/status block (line ~134) becomes (draft switches to mar
 .mc-dock-statusline{font-style:italic;color:var(--text-dim);}
 ```
 
-- [ ] **Step 7.4: Run to verify pass**
+- [x] **Step 7.4: Run to verify pass**
 
 Run: `cd frontend && npx vitest run src/components/AssistantPanel.test.tsx`
 Expected: PASS, including the pre-existing panel tests (markdown draft must not break them).
 
-- [ ] **Step 7.5: Frontend full gate**
+- [x] **Step 7.5: Frontend full gate**
 
 Run: `cd frontend && npm test && npm run build`
 Expected: PASS (build catches the TS union changes everywhere, e.g. MapWorkspace handlers).
 
-- [ ] **Step 7.6: Commit**
+- [x] **Step 7.6: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/AssistantPanel.tsx frontend/src/styles/mapWorkspace.css frontend/src/components/AssistantPanel.test.tsx
@@ -1521,11 +1521,11 @@ git commit -m "feat(frontend): render status lines and replace events in the Cop
 - Modify: `docs/architecture/assistant.md`
 - Modify: `docs/ROADMAP.md` (Phase 7 section, before `## Waypoint on iOS` at line ~245)
 
-- [ ] **Step 8.1: Update the assistant architecture doc**
+- [x] **Step 8.1: Update the assistant architecture doc**
 
 Read `docs/architecture/assistant.md` first; update the turn-flow / SSE-events description to match reality: the seven event types (`meta`, `status`, `tool`, `token`, `replace`, `done`, `error`), the narration call (grounded on the tool result + template, Copper persona, `stream: true`), the holdback stream guard (full-text scan per delta, 12-word release lag, complete violating phrase can never render), the fallback ladder (guard trip → redirect; narration unreachable/empty/mid-stream death → deterministic template), and the `MCA_ASSISTANT_NARRATION_ENABLED` kill switch. Keep the doc's existing voice and structure — amend sections, don't rewrite the file.
 
-- [ ] **Step 8.2: Add the roadmap item**
+- [x] **Step 8.2: Add the roadmap item**
 
 In `docs/ROADMAP.md`, at the end of the Phase 7 item list (before `## Waypoint on iOS (2026-07-10)`):
 
@@ -1538,7 +1538,7 @@ In `docs/ROADMAP.md`, at the end of the Phase 7 item list (before `## Waypoint o
   `docs/superpowers/specs/2026-07-12-assistant-token-streaming-design.md`.
 ```
 
-- [ ] **Step 8.3: Commit**
+- [x] **Step 8.3: Commit**
 
 ```bash
 git add docs/architecture/assistant.md docs/ROADMAP.md
@@ -1549,15 +1549,15 @@ git commit -m "docs: assistant streaming architecture + roadmap tick"
 
 ### Task 9: Full verification gate
 
-- [ ] **Step 9.1: Run the complete gate from the worktree root**
+- [x] **Step 9.1: Run the complete gate from the worktree root**
 
 Run: `make test-all`
 Expected: pytest + ruff + frontend `npm test` + `npm run build` all green. Fix anything that fails before proceeding (the fix belongs to whichever task introduced it).
 
-- [ ] **Step 9.2: Check off all boxes in this plan and re-read the spec**
+- [x] **Step 9.2: Check off all boxes in this plan and re-read the spec**
 
 Confirm each spec section (§1–§9) maps to landed code. Spec §8's test list must each have a passing test.
 
-- [ ] **Step 9.3: Final commit if anything moved, then hand off**
+- [x] **Step 9.3: Final commit if anything moved, then hand off**
 
 The branch is ready for PR per the roadmap cadence (user squash-merges). PR body should note: behavior with the kill switch off is byte-identical to main; item 4 of `docs/IOS.md` becomes literally true on the next on-device run.
