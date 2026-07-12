@@ -243,9 +243,10 @@ spec → plan → PR.*
   de-merge, privacy posture) as long-form pieces linked from the README.
 - [x] **Copper streamed finals + turn progress:** model-authored replies in Copper's
   voice streamed token-by-token (second, streamed narration call grounded on the tool
-  result + deterministic template), honest `status` phase events during the planning
-  wait, and a holdback stream guard that keeps the no-safety-scoring invariant absolute
-  mid-stream. Kill switch `MCA_ASSISTANT_NARRATION_ENABLED`. Spec:
+  result + deterministic template), honest `status` phase events during the planning,
+  tool, and narration waits, and a holdback stream guard that keeps the
+  no-safety-scoring invariant absolute mid-stream. Kill switch
+  `MCA_ASSISTANT_NARRATION_ENABLED`. Spec:
   `docs/superpowers/specs/2026-07-12-assistant-token-streaming-design.md`.
 
 ## Waypoint on iOS (2026-07-10)

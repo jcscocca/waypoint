@@ -1,6 +1,6 @@
 Reference for the Waypoint Analyst — the optional chat assistant that is grounded in the user's current dashboard data and answers questions about reported SPD incident context.
 
-> Verified against `d30235b` (2026-06-29).
+> Verified against `5641377` (2026-07-12).
 
 ## Persona — "Copper, case desk"
 
@@ -85,7 +85,7 @@ event types (`AssistantStreamEvent`, `app/assistant/schemas.py`):
 |---|---|---|
 | `meta` | `{role, missing_context}` | Once, first, before any guard or LLM contact |
 | `status` | `{label}` | Zero or more times: `"interpreting your request…"` before the planning call, `"running <tool>…"` before tool execution, `"writing up…"` before the narration call |
-| `tool` | raw `{tool_name, result}` | Once, on a successful `tool_call` plan, before the summary/narration |
+| `tool` | raw `{tool_name, arguments, result}` | Once, on a successful `tool_call` plan, before the summary/narration |
 | `token` | `{delta}` | Many times — small narration deltas, or once with the full deterministic text when narration is off/skipped |
 | `replace` | `{text}` | At most once — wholesale replacement of everything streamed so far as `token` deltas for this turn (guard trip or narration failure) |
 | `done` | `{}` | Once, always last on a turn that didn't error |
@@ -357,21 +357,25 @@ flowchart TD
     E -- LlmUnavailable --> F[Stream error event]
     E -- bad JSON --> G[Stream error event]
     E -- type: final --> H[_final_message\nvalidate non-empty string]
-    H -- output guard trips on draft --> H3[Stream guarded redirect\ntoken + done\nnarration skipped]
-    H -- clean, narration off --> P[Stream draft as one\ntoken event + done]
-    H -- clean, narration on --> R1
+    H -- output guard trips on draft --> H1[Stream guarded redirect\ntoken + done\nnarration skipped]
+    H -- clean, narration off --> H2[Stream draft as one\ntoken event + done]
+    H -- clean, narration on --> S1[Stream status: writing up…\nsession.rollback before the await]
+    S1 --> S2[Narration call: llm_client.stream\nthrough guarded_stream\ngrounded on the draft\nStream token events]
+    S2 -- guard trips --> S3[Stream replace event: redirect\n+ done]
+    S2 -- unreachable / empty /\ndies mid-stream --> S4[Stream replace event: draft\n+ done]
+    S2 -- completes clean --> S5[Stream done event]
     E -- type: tool_call --> J[_tool_arguments\nbackfill from dashboard_state]
     J --> K[execute_tool\napp/assistant/tools.py]
     K -- AssistantClarification --> L[Stream clarifying question\nas token event + done]
     K -- AssistantToolError --> M[Stream error event]
     K -- success --> N[Stream tool event\nraw result payload]
     N --> O[build_tool_summary\ndeterministic one-liner, no LLM]
-    O -- narration off --> P
+    O -- narration off --> P[Stream summary as one\ntoken event + done]
     O -- narration on --> R1[Stream status: writing up…\nsession.rollback before the await]
     R1 --> R2[Narration call: llm_client.stream\nCopper persona + grounding\ntemperature 0.4, max_tokens 256]
     R2 --> R3[guarded_stream: re-scan full text\nper delta, release 16 words\nbehind the write head\nStream token events]
     R3 -- guard trips --> R4[Stream replace event: redirect\n+ done]
-    R3 -- unreachable / empty /\ndies mid-stream --> R5[Stream replace event: fallback text\ntemplate summary or draft\n+ done]
+    R3 -- unreachable / empty /\ndies mid-stream --> R5[Stream replace event: template summary\n+ done]
     R3 -- completes clean --> R6[Stream done event]
     P --> Q([Frontend: interpretToolResult\nassistantBridge.ts updates pane + tab])
     R4 --> Q
