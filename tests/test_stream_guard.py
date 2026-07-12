@@ -130,6 +130,50 @@ def test_real_presence_pattern_long_span_trips_before_suffix_releases() -> None:
     assert "incident" not in released
 
 
+def test_mid_word_split_does_not_false_trip() -> None:
+    # \b matches at end-of-string: "Safe" + "way" must not trip the safety pattern.
+    from app.assistant.agent import _contains_safety_ranking
+
+    parts = ["Counts near the Safe", "way on 15th are steady this month."]
+
+    def check(text: str) -> str | None:
+        return "REDIRECT" if _contains_safety_ranking(text) else None
+
+    released = _collect(parts, check)
+    assert "".join(released) == "".join(parts)
+
+
+def test_violation_completed_across_split_still_trips() -> None:
+    # "danger" + "ous area" completes the word mid-second-delta; the check must fire
+    # once the word is complete (a later word follows it in the same delta).
+    def check(text: str) -> str | None:
+        return "REDIRECT" if "dangerous" in text else None
+
+    async def run() -> None:
+        with pytest.raises(StreamGuardTripped):
+            async for _chunk in guarded_stream(
+                _deltas(["this area is danger", "ous overall honestly"]), check
+            ):
+                pass
+
+    asyncio.run(run())
+
+
+def test_violation_in_final_partial_word_trips_on_end_scan() -> None:
+    # The stream ends mid-word; only the post-loop full-text scan can see it.
+    def check(text: str) -> str | None:
+        return "REDIRECT" if "dangerous" in text else None
+
+    async def run() -> None:
+        with pytest.raises(StreamGuardTripped):
+            async for _chunk in guarded_stream(
+                _deltas(["this area is danger", "ous"]), check
+            ):
+                pass
+
+    asyncio.run(run())
+
+
 def test_trip_survives_upstream_cleanup_failure() -> None:
     # A fault in the upstream generator's cleanup must not mask the trip — the
     # consumer relies on StreamGuardTripped to emit the redirect replace event.

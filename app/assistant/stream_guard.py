@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator, Callable
 HOLDBACK_WORDS = 16
 
 _WORD = re.compile(r"\S+")
+_TRAILING_PARTIAL = re.compile(r"\S+\Z")
 
 
 class StreamGuardTripped(Exception):
@@ -36,15 +37,16 @@ async def guarded_stream(
     try:
         async for delta in deltas:
             accumulated += delta
-            redirect = check(accumulated)
+            redirect = check(_checkable_prefix(accumulated))
             if redirect is not None:
                 raise StreamGuardTripped(redirect)
             boundary = _release_boundary(accumulated)
             if boundary > released:
                 yield accumulated[released:boundary]
                 released = boundary
-        # The in-loop check already scanned this exact final text; this re-check is
-        # belt-and-braces for an empty stream (loop never ran), not a distinct trip point.
+        # Load-bearing full-text scan: the in-loop checks trim a trailing partial
+        # word, so this is the only check that sees the final word when the stream
+        # ends mid-word.
         redirect = check(accumulated)
         if redirect is not None:
             raise StreamGuardTripped(redirect)
@@ -57,6 +59,17 @@ async def guarded_stream(
                 await closer()
             except Exception:
                 pass  # never mask the in-flight StreamGuardTripped / normal completion
+
+
+def _checkable_prefix(text: str) -> str:
+    """Text up to the last complete word. The guard patterns are \\b-anchored and \\b
+    matches at end-of-string, so scanning a mid-word delta boundary would false-trip
+    ("Safe" + "way"). The trailing partial word is always the newest word — held far
+    inside the holdback — and the end-of-stream full-text scan covers it once complete."""
+    if not text or text[-1].isspace():
+        return text
+    match = _TRAILING_PARTIAL.search(text)
+    return text[: match.start()] if match else text
 
 
 def _release_boundary(text: str) -> int:
