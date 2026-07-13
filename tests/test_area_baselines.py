@@ -71,6 +71,22 @@ def test_load_mcpp_areas_and_polygons_from_files(tmp_path):
                             "coordinates": [[[5, 5], [6, 5], [6, 6], [5, 6], [5, 5]]],
                         },
                     },
+                    {  # MultiPolygon polygons extend the same name's list
+                        "type": "Feature",
+                        "properties": {"mcpp": "TEST HILL"},
+                        "geometry": {
+                            "type": "MultiPolygon",
+                            "coordinates": [
+                                [[[2, 2], [3, 2], [3, 3], [2, 3], [2, 2]]],
+                                [[[8, 8], [9, 8], [9, 9], [8, 9], [8, 8]]],
+                            ],
+                        },
+                    },
+                    {  # non-polygon geometry types are skipped
+                        "type": "Feature",
+                        "properties": {"mcpp": "POINT JUNK"},
+                        "geometry": {"type": "Point", "coordinates": [7, 7]},
+                    },
                 ],
             }
         ),
@@ -79,6 +95,8 @@ def test_load_mcpp_areas_and_polygons_from_files(tmp_path):
     assert load_mcpp_areas(csv_path) == {"TEST HILL": 3.0}
     polygons = load_mcpp_polygons(geo_path)
     assert set(polygons) == {"TEST HILL"}
+    # 1 polygon from the Polygon feature + 2 from the MultiPolygon feature.
+    assert len(polygons["TEST HILL"]) == 3
 
 
 def test_load_mcpp_areas_rejects_non_positive_area(tmp_path):
