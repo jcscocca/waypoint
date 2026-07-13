@@ -361,6 +361,8 @@ def execute_tool(
                 nibrs_group=args.nibrs_group,
                 area_lookup=_beat_areas(),
                 beat_polygons=_beat_polygons(),
+                mcpp_area_lookup=_mcpp_areas(),
+                mcpp_polygons=_mcpp_polygons(),
                 sources=sources_for_layer(args.layer),
             )
             validated_arguments = args.model_dump(mode="json")
