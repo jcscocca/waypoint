@@ -248,13 +248,17 @@ def _baselines_for_place(
     beat_rest_area: float | None,
     mcpp_area_lookup: dict[str, float] | None,
     mcpp_polygons: BeatPolygons | None,
+    query_cache: dict[tuple, list[CrimeIncidentData]],
 ) -> list[dict[str, Any]]:
     """One comparison entry per resolvable baseline geography, all sharing the place's
     buffer rate. MCPP and beat are rest-of-area (buffer carved out, mirroring the legacy
     beat baseline); sector and citywide are whole-area — the buffer is negligible at
-    those scales. Geography that cannot be resolved (no polygon hit, no sector letter)
-    is omitted rather than reported as a failed comparison; statistical inadequacy on a
-    resolved geography reports relation="insufficient" via the decision machinery.
+    those scales. The whole-area approximation also applies to the dispersion input: the
+    place's own incidents appear in both halves of the combined monthly counts for
+    sector/city, which is negligible at those scales. Geography that cannot be resolved
+    (no polygon hit, no sector letter) is omitted rather than reported as a failed
+    comparison; statistical inadequacy on a resolved geography reports
+    relation="insufficient" via the decision machinery.
     """
     candidates: list[dict[str, Any]] = []
 
@@ -304,20 +308,28 @@ def _baselines_for_place(
     if sector:
         members = sorted(b for b in area_lookup if sector_for_beat(b) == sector)
         if members:
-            incidents = _area_incidents(
-                session, CrimeIncident.beat, members, start, end,
-                offense_category, offense_subcategory, nibrs_group, sources=sources,
-            )
+            cache_key = ("sector", sector)
+            incidents = query_cache.get(cache_key)
+            if incidents is None:
+                incidents = _area_incidents(
+                    session, CrimeIncident.beat, members, start, end,
+                    offense_category, offense_subcategory, nibrs_group, sources=sources,
+                )
+                query_cache[cache_key] = incidents
             candidates.append(
                 {"kind": "sector", "label": f"Sector {sector}", "incidents": incidents,
                  "area_km2": sum(area_lookup[b] for b in members)}
             )
 
     if area_lookup:
-        incidents = _area_incidents(
-            session, CrimeIncident.beat, sorted(area_lookup), start, end,
-            offense_category, offense_subcategory, nibrs_group, sources=sources,
-        )
+        cache_key = ("city",)
+        incidents = query_cache.get(cache_key)
+        if incidents is None:
+            incidents = _area_incidents(
+                session, CrimeIncident.beat, sorted(area_lookup), start, end,
+                offense_category, offense_subcategory, nibrs_group, sources=sources,
+            )
+            query_cache[cache_key] = incidents
         candidates.append(
             {"kind": "city", "label": "Citywide", "incidents": incidents,
              "area_km2": sum(area_lookup.values())}
@@ -527,6 +539,8 @@ def neighborhood_analysis_for_places(
     adjusted_iter = iter(adjusted)
 
     places = []
+    # Sector/city baselines are place-independent; compute each once per request.
+    baseline_query_cache: dict[tuple, list[CrimeIncidentData]] = {}
     for entry in raw:
         cluster = entry["cluster"]
         baselines = (
@@ -550,6 +564,7 @@ def neighborhood_analysis_for_places(
                 beat_rest_area=entry.get("rest_area"),
                 mcpp_area_lookup=mcpp_area_lookup,
                 mcpp_polygons=mcpp_polygons,
+                query_cache=baseline_query_cache,
             )
         )
         base = {

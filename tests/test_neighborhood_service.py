@@ -453,7 +453,7 @@ def test_non_sector_beat_omits_sector_baseline(tmp_path):
     assert "city" in kinds
 
 
-def test_baseline_p_values_are_bh_adjusted_within_place(tmp_path):
+def test_baseline_entries_carry_adjusted_p_and_legacy_fields(tmp_path):
     session, user_hash, place_id = session_with_places_and_beat_crime(tmp_path)
     place = _run_with_baselines(session, user_hash, place_id)["places"][0]
     for entry in place["baselines"]:
