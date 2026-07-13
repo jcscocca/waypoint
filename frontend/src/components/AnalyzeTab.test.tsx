@@ -40,7 +40,7 @@ const homePlace: NeighborhoodPlace = {
     { kind: "mcpp", label: "Capitol Hill", area_km2: 2.4, baseline_incident_count: 320, baseline_rate: 0.20, rate_ratio: 3.4, ci_lower: 2.1, ci_upper: 5.5, adjusted_p_value: 0.002, method: "quasi_poisson", relation: "above" },
     { kind: "beat", label: "Beat M2", area_km2: 1.1, baseline_incident_count: 180, baseline_rate: 0.17, rate_ratio: 4.0, ci_lower: 2.1, ci_upper: 7.6, adjusted_p_value: 0.002, method: "quasi_poisson", relation: "above" },
     { kind: "sector", label: "Sector M", area_km2: 5.0, baseline_incident_count: 600, baseline_rate: 0.62, rate_ratio: 1.1, ci_lower: 0.7, ci_upper: 1.6, adjusted_p_value: 0.4, method: "quasi_poisson", relation: "similar" },
-    { kind: "city", label: "Citywide", area_km2: 217, baseline_incident_count: 40000, baseline_rate: 0.024, rate_ratio: 3.9, ci_lower: 2.0, ci_upper: 7.2, adjusted_p_value: 0.001, method: "quasi_poisson", relation: "above" },
+    { kind: "city", label: "Citywide", area_km2: 217, baseline_incident_count: 40000, baseline_rate: 0.024, rate_ratio: 27.9, ci_lower: 14.0, ci_upper: 55.0, adjusted_p_value: 0.001, method: "quasi_poisson", relation: "above" },
   ],
   category_breakdown: [
     { label: "Theft", place_count: 5, place_share: 0.71, beat_share: 0.20 },

@@ -54,6 +54,16 @@ describe("BaselineIntervalPlot", () => {
     const { container } = render(<BaselineIntervalPlot place={bare} identity={placeIdentity(0)} noun={noun} domainMax={1} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("keeps the band, label, and axis in the same track coordinate system as the marks", () => {
+    const { container } = render(<BaselineIntervalPlot place={place} identity={placeIdentity(0)} noun={noun} domainMax={plotDomainMax([place])} />);
+    const band = container.querySelector(".mc-bplot-band");
+    const axis = container.querySelector(".mc-bplot-foot .axis");
+    const dot = container.querySelector(".mc-bplot-row .dot");
+    expect(band?.closest(".track")).not.toBeNull();
+    expect(axis?.closest(".track")).not.toBeNull();
+    expect(dot?.closest(".track")).not.toBeNull();
+  });
 });
 
 describe("plotDomainMax", () => {

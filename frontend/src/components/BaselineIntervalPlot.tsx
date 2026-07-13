@@ -61,12 +61,17 @@ export function BaselineIntervalPlot({
     <div className={`mc-bplot id-${identity.slot}`} data-testid="baseline-plot">
       <p className="mc-label">{noun.pluralCap} per year within {radius} m — 95% interval</p>
       <div className="mc-bplot-chart">
-        <span
-          className="mc-bplot-band"
-          aria-hidden="true"
-          style={{ left: `${bandLeft}%`, width: `${bandWidth}%` }}
-          title={`95% interval ${perYear(place.place_rate_ci_lower)}–${perYear(place.place_rate_ci_upper)} /yr`}
-        />
+        <div className="mc-bplot-overlay" aria-hidden="true">
+          <span className="name" />
+          <span className="track">
+            <span
+              className="mc-bplot-band"
+              style={{ left: `${bandLeft}%`, width: `${bandWidth}%` }}
+              title={`95% interval ${perYear(place.place_rate_ci_lower)}–${perYear(place.place_rate_ci_upper)} /yr`}
+            />
+          </span>
+          <span className="val" />
+        </div>
         <div className="mc-bplot-row">
           <span className="name" data-testid="bplot-name">This place</span>
           <span className="track">

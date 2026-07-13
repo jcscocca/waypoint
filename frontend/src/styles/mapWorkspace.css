@@ -505,7 +505,9 @@ input.mc-inp:focus{outline:2px solid var(--accent);outline-offset:1px;}
 .mc-bplot{display:grid;gap:6px;margin:2px 0 4px;--idc:var(--id-x);}
 .mc-bplot.id-a{--idc:var(--id-a);}.mc-bplot.id-b{--idc:var(--id-b);}.mc-bplot.id-c{--idc:var(--id-c);}.mc-bplot.id-d{--idc:var(--id-d);}
 .mc-bplot-chart{position:relative;display:grid;gap:5px;}
-.mc-bplot-band{position:absolute;top:0;bottom:26px;border-radius:4px;background:color-mix(in srgb,var(--idc) 9%,transparent);border-left:1px dashed color-mix(in srgb,var(--idc) 55%,transparent);border-right:1px dashed color-mix(in srgb,var(--idc) 55%,transparent);pointer-events:none;}
+.mc-bplot-overlay{position:absolute;inset:0 0 26px 0;display:grid;grid-template-columns:96px 1fr 148px;gap:10px;pointer-events:none;}
+.mc-bplot-overlay .track{position:relative;}
+.mc-bplot-band{position:absolute;top:0;bottom:0;border-radius:4px;background:color-mix(in srgb,var(--idc) 9%,transparent);border-left:1px dashed color-mix(in srgb,var(--idc) 55%,transparent);border-right:1px dashed color-mix(in srgb,var(--idc) 55%,transparent);}
 .mc-bplot-row{display:grid;grid-template-columns:96px 1fr 148px;align-items:center;gap:10px;height:16px;position:relative;}
 .mc-bplot-row .name{font-size:11.5px;color:var(--text);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mc-bplot-row .track{position:relative;height:100%;}
@@ -514,6 +516,7 @@ input.mc-inp:focus{outline:2px solid var(--accent);outline-offset:1px;}
 .mc-bplot-row .tickmark{position:absolute;top:50%;transform:translate(-50%,-50%);width:3px;height:12px;border-radius:2px;background:var(--text);}
 .mc-bplot-row .val{font-size:11px;color:var(--text);}
 .mc-bplot-foot{display:grid;grid-template-columns:96px 1fr 148px;gap:10px;height:26px;position:relative;}
+.mc-bplot-foot .track{position:relative;height:100%;}
 .mc-bplot-bandlabel{position:absolute;top:1px;display:flex;justify-content:center;gap:4px;align-items:center;font-size:9.5px;color:var(--text);white-space:nowrap;}
 .mc-bplot-bandlabel i{width:7px;height:7px;border-radius:2px;background:var(--idc);opacity:.55;}
 .mc-bplot-foot .axis{position:absolute;left:0;right:0;bottom:0;height:12px;border-top:1px solid var(--border);font-size:10px;color:var(--text);}
