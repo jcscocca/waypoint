@@ -34,6 +34,7 @@ from app.services.dashboard_analysis_service import (
 )
 from app.services.geocoding_service import search_addresses
 from app.services.incident_points_service import incident_points
+from app.services.mcpp_geometry_service import mcpp_geojson_payloads
 from app.services.neighborhood_service import neighborhood_analysis_for_places
 
 router = APIRouter()
@@ -191,6 +192,23 @@ def dashboard_beats(
     # StreamingResponse and break its incremental flush, and per-request middleware
     # compression would defeat the once-cached gzip bytes.
     raw, gzipped = beats_geojson_payloads()
+    headers = {"Cache-Control": "public, max-age=3600", "Vary": "Accept-Encoding"}
+    if "gzip" in request.headers.get("accept-encoding", "").lower():
+        headers["Content-Encoding"] = "gzip"
+        return Response(content=gzipped, media_type="application/geo+json", headers=headers)
+    return Response(content=raw, media_type="application/geo+json", headers=headers)
+
+
+@router.get("/dashboard/mcpp")
+def dashboard_mcpp(
+    request: Request,
+    _user_id_hash: Annotated[str, Depends(required_public_user_hash)],
+) -> Response:
+    """SPD MCPP (neighborhood) polygons for map/locator layers (static bundled data)."""
+    # Negotiation is hand-rolled: global GZipMiddleware would wrap the /assistant/chat SSE
+    # StreamingResponse and break its incremental flush, and per-request middleware
+    # compression would defeat the once-cached gzip bytes.
+    raw, gzipped = mcpp_geojson_payloads()
     headers = {"Cache-Control": "public, max-age=3600", "Vary": "Accept-Encoding"}
     if "gzip" in request.headers.get("accept-encoding", "").lower():
         headers["Content-Encoding"] = "gzip"
