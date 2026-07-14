@@ -123,8 +123,9 @@ function makeSiteComparison(aLabel: string, bLabel: string): SiteComparison {
 
 beforeEach(() => {
   // Clear the stored theme and the document attribute so the toggle test
-  // doesn't inherit prior-test state.
-  localStorage.removeItem("wp-theme");
+  // doesn't inherit prior-test state; clear all storage so the persisted
+  // `compcat.selection` key never leaks between tests.
+  localStorage.clear();
   document.documentElement.removeAttribute("data-theme");
 });
 afterEach(() => {
@@ -193,7 +194,7 @@ describe("MapWorkspace", () => {
     vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
     vi.mocked(getDashboardSummary)
       .mockResolvedValueOnce(makeSummary())
-      .mockResolvedValueOnce(makeSummary([home]));
+      .mockResolvedValue(makeSummary([home]));
     vi.mocked(createPlace).mockResolvedValue(home);
     vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 1 });
 
@@ -212,8 +213,13 @@ describe("MapWorkspace", () => {
       expect(within(analyzePanel).getByRole("checkbox", { name: "Home" })).toHaveAttribute("aria-checked", "true");
     });
 
+    // The restored selection auto-runs (analysis greets you); clear it so the manual run
+    // below is what the payload assertion verifies.
+    await waitFor(() => expect(analyzePlaces).toHaveBeenCalled());
+    vi.mocked(analyzePlaces).mockClear();
+
     fireEvent.click(screen.getByRole("tab", { name: /analyze/i }));
-    fireEvent.click(screen.getByRole("button", { name: /run analysis/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /run analysis/i }));
 
     await waitFor(() => {
       expect(analyzePlaces).toHaveBeenCalledWith({
@@ -232,7 +238,7 @@ describe("MapWorkspace", () => {
     vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
     vi.mocked(getDashboardSummary)
       .mockResolvedValueOnce(makeSummary())
-      .mockResolvedValueOnce(makeSummary([home, work]));
+      .mockResolvedValue(makeSummary([home, work]));
     vi.mocked(createBulkPlaces).mockResolvedValue({ created_count: 2, skipped_count: 0, places: [home, work] });
     vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 2 });
 
@@ -249,8 +255,13 @@ describe("MapWorkspace", () => {
     expect(await screen.findByRole("checkbox", { name: "Select Home" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("checkbox", { name: "Select Work" })).toHaveAttribute("aria-checked", "true");
 
+    // The restored selection auto-runs (analysis greets you); clear it so the manual run
+    // below is what the payload assertion verifies.
+    await waitFor(() => expect(analyzePlaces).toHaveBeenCalled());
+    vi.mocked(analyzePlaces).mockClear();
+
     fireEvent.click(screen.getByRole("tab", { name: /analyze/i }));
-    fireEvent.click(screen.getByRole("button", { name: /run analysis/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /run analysis/i }));
 
     await waitFor(() => {
       expect(analyzePlaces).toHaveBeenCalledWith({
@@ -336,9 +347,13 @@ describe("MapWorkspace", () => {
     render(<MapWorkspace />);
     await screen.findByText("Home");
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Home" }));
+    // The restored selection (all places) auto-runs on load; clear that call so the manual
+    // run below is what the payload assertion verifies. Home is already selected.
+    await waitFor(() => expect(analyzePlaces).toHaveBeenCalled());
+    vi.mocked(analyzePlaces).mockClear();
+
     fireEvent.click(screen.getByRole("tab", { name: /analyze/i }));
-    fireEvent.click(screen.getByRole("button", { name: /run analysis/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /run analysis/i }));
 
     await waitFor(() => {
       expect(analyzePlaces).toHaveBeenCalledWith({
@@ -362,9 +377,13 @@ describe("MapWorkspace", () => {
     render(<MapWorkspace />);
     await screen.findByText("Home");
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Home" }));
+    // Auto-run greets on load and fetches incident details; clear that call so the manual
+    // run below is what the payload assertion verifies. Home is already selected.
+    await waitFor(() => expect(getIncidentDetails).toHaveBeenCalled());
+    vi.mocked(getIncidentDetails).mockClear();
+
     fireEvent.click(screen.getByRole("tab", { name: /analyze/i }));
-    fireEvent.click(screen.getByRole("button", { name: /run analysis/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /run analysis/i }));
 
     await waitFor(() => {
       expect(getIncidentDetails).toHaveBeenCalledWith({
@@ -389,9 +408,13 @@ describe("MapWorkspace", () => {
     render(<MapWorkspace />);
     await screen.findByText("Home");
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Home" }));
+    // Auto-run greets on load and fetches the neighborhood slice; clear that call so the
+    // manual run below is what the payload assertion verifies. Home is already selected.
+    await waitFor(() => expect(getNeighborhoodAnalysis).toHaveBeenCalled());
+    vi.mocked(getNeighborhoodAnalysis).mockClear();
+
     fireEvent.click(screen.getByRole("tab", { name: /analyze/i }));
-    fireEvent.click(screen.getByRole("button", { name: /run analysis/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /run analysis/i }));
 
     await waitFor(() => {
       expect(getNeighborhoodAnalysis).toHaveBeenCalledWith(
@@ -409,10 +432,7 @@ describe("MapWorkspace", () => {
     render(<MapWorkspace />);
     await screen.findByText("Home");
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Home" }));
-    fireEvent.click(screen.getByRole("tab", { name: /analyze/i }));
-    fireEvent.click(screen.getByRole("button", { name: /run analysis/i }));
-
+    // Auto-run greets on load and renders incident details for the restored selection.
     expect(await screen.findByText("100 block of Main St")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "500 m" }));
@@ -749,5 +769,71 @@ describe("MapWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(screen.queryByTestId("draft-pin")).not.toBeInTheDocument());
+  });
+
+  it("auto-runs analysis on load with the restored selection", async () => {
+    localStorage.setItem("compcat.selection", JSON.stringify([home.id]));
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([home, work]));
+    vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 1 });
+
+    render(<MapWorkspace />);
+
+    await waitFor(() => {
+      expect(analyzePlaces).toHaveBeenCalledTimes(1);
+      expect(analyzePlaces).toHaveBeenCalledWith(
+        expect.objectContaining({ place_ids: [home.id] }),
+      );
+    });
+  });
+
+  it("auto-runs with all places when nothing is stored", async () => {
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([home, work]));
+    vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 2 });
+
+    render(<MapWorkspace />);
+
+    await waitFor(() =>
+      expect(analyzePlaces).toHaveBeenCalledWith(
+        expect.objectContaining({ place_ids: expect.arrayContaining([home.id, work.id]) }),
+      ),
+    );
+  });
+
+  it("does not auto-run for an empty session", async () => {
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary());
+
+    render(<MapWorkspace />);
+
+    await screen.findByRole("heading", { name: /look up an address/i });
+    expect(analyzePlaces).not.toHaveBeenCalled();
+  });
+
+  it("exits a shared view and selects the clicked place from a chip", async () => {
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([home]));
+    vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 1 });
+
+    const view = encodeView({
+      tab: "analyze",
+      points: [{ latitude: 47.61, longitude: -122.34, label: "Pike Place" }],
+      radiusM: 250, startDate: "2024-01-01", endDate: "2024-01-31",
+      layer: "reported", offenseCategory: "",
+    });
+    window.history.replaceState({}, "", `/?view=${view}`);
+    render(<MapWorkspace />);
+
+    const chip = await screen.findByRole("checkbox", { name: home.display_label });
+    fireEvent.click(chip);
+
+    expect(screen.queryByText(/shared view/i)).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(analyzePlaces).toHaveBeenCalledWith(
+        expect.objectContaining({ place_ids: [home.id] }),
+      ),
+    );
+    window.history.replaceState({}, "", "/");
   });
 });
