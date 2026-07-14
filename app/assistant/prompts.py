@@ -5,7 +5,7 @@ from typing import Any
 
 from app.assistant.schemas import AssistantChatMessage, SemanticContextPacket
 
-PLANNING_SYSTEM_PROMPT = """You are Waypoint's incident-context analyst.
+PLANNING_SYSTEM_PROMPT = """You are CompCat's incident-context analyst.
 Use only the semantic context and approved tool results.
 The active data layer is active_filters.layer: "reported" means SPD crime reports;
 "arrests" means SPD arrest records — enforcement activity, not reported incidents (an arrest

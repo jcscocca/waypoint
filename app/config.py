@@ -69,13 +69,13 @@ class Settings(BaseSettings):
 
     geocoder_provider: str = "nominatim"
     geocoder_base_url: str = "https://nominatim.openstreetmap.org/search"
-    geocoder_user_agent: str = "Waypoint/0.1"
+    geocoder_user_agent: str = "CompCat/0.1"
     geocoder_contact_email: str = ""
     geocoder_cache_ttl_days: int = 30
     geocoder_max_results: int = 5
     geocoder_timeout_s: float = 5.0
     geocoder_min_interval_s: float = 1.0
-    # Waypoint only has Seattle SPD data, so region-lock geocoding: bias (and by default
+    # CompCat only has Seattle SPD data, so region-lock geocoding: bias (and by default
     # hard-restrict via bounded) results to a Seattle-metro bounding box so ambiguous names
     # like "Capitol Hill" resolve in Seattle, not the globally-dominant match (e.g. DC).
     # Nominatim viewbox format: "x1,y1,x2,y2" = lon,lat,lon,lat (W,N corner then E,S corner).
