@@ -39,6 +39,7 @@ vi.mock("../api/client", () => ({
   getDashboardFreshness: vi.fn().mockResolvedValue(null),
   getInputModes: vi.fn().mockResolvedValue({ modes: [] }),
   streamAssistantChat: vi.fn(),
+  updatePlace: vi.fn(),
 }));
 
 const geocodeSearch = vi.hoisted(() => vi.fn());
@@ -48,7 +49,7 @@ vi.mock("../lib/geocoding", async (importOriginal) => ({
 }));
 
 import { MapWorkspace } from "./MapWorkspace";
-import { analyzePlaces, comparePlaces, createBulkPlaces, createPlace, createSession, getDashboardSummary, getIncidentDetails, getMcppPolygons, getNeighborhoodAnalysis, streamAssistantChat } from "../api/client";
+import { analyzePlaces, comparePlaces, createBulkPlaces, createPlace, createSession, getDashboardSummary, getIncidentDetails, getMcppPolygons, getNeighborhoodAnalysis, streamAssistantChat, updatePlace } from "../api/client";
 import { currentYearAnalysisWindow } from "../lib/analysisDefaults";
 import { encodeView } from "../lib/savedView";
 import type { DashboardSummary, IncidentDetailsResponse, NeighborhoodAnalysis, Place, SiteComparison } from "../types";
@@ -294,6 +295,24 @@ describe("MapWorkspace", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     const analyzePanel = screen.getByRole("tabpanel", { name: "Analyze" });
     expect(within(analyzePanel).getByRole("button", { name: /save pin/i })).toBeInTheDocument();
+  });
+
+  it("surfaces an error when a rename fails", async () => {
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([home]));
+    vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 1 });
+    vi.mocked(updatePlace).mockRejectedValue(new Error("boom"));
+
+    render(<MapWorkspace />);
+    await screen.findByText("Home");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add or manage places" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rename Home" }));
+    const input = screen.getByRole("textbox", { name: "New name for Home" });
+    fireEvent.change(input, { target: { value: "Home base" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(await screen.findByText("Unable to rename place. Try again.")).toBeInTheDocument();
   });
 
   it("marks the frame is-focus only when the drawer leaves less than the chrome minimum", async () => {

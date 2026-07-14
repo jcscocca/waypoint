@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
-import { createBulkPlaces, createPlace, deletePlace, getBeatPolygons, getMcppPolygons } from "../api/client";
+import { createBulkPlaces, createPlace, deletePlace, getBeatPolygons, getMcppPolygons, updatePlace } from "../api/client";
 import { currentYearAnalysisWindow } from "../lib/analysisDefaults";
 import { compactGeocodeLabel } from "../lib/addressLabel";
 import { interpretToolResult } from "../lib/assistantBridge";
@@ -537,6 +537,15 @@ export function MapWorkspace() {
             onImportSubmit={handleImport}
             onUploaded={data.personalUploadsEnabled ? () => data.refreshWithFallback("Uploaded, but dashboard totals could not refresh.") : undefined}
             onClose={() => setManagePlaces(null)}
+            onRename={async (id, label) => {
+              data.setError("");
+              try {
+                await updatePlace(id, { display_label: label });
+                await data.refreshWithFallback("Renamed, but dashboard totals could not refresh.");
+              } catch {
+                data.setError("Unable to rename place. Try again.");
+              }
+            }}
           />
         ) : null}
       </div>
