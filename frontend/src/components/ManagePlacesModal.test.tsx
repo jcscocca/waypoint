@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ManagePlacesModal } from "./ManagePlacesModal";
-import type { Place } from "../types";
+import type { DashboardSummary, Place } from "../types";
 
 afterEach(cleanup);
 
@@ -56,6 +56,20 @@ describe("ManagePlacesModal", () => {
   it("opens directly on a non-manage view when asked", () => {
     render(<ManagePlacesModal {...baseProps} initialView="manual" />);
     expect(screen.getByRole("dialog", { name: "Add a place manually" })).toBeInTheDocument();
+  });
+
+  it("shows the hidden-places privacy badge when the summary reports suppressed places", () => {
+    const summary: DashboardSummary = {
+      totals: { place_count: 2, visit_count: 0, incident_count: 0 },
+      privacy: { normal: 0, home_candidate: 0, work_candidate: 0, suppressed: 2 },
+      places: [],
+      crime_summaries: [],
+      analysis: { available_radii_m: [400] },
+      exports: { tableau_place_summary_csv: "/x.csv" },
+    };
+    render(<ManagePlacesModal {...baseProps} summary={summary} initialView="manage" />);
+    const badge = screen.getByText("2 hidden");
+    expect(badge).toHaveAttribute("title", "Hidden from public exports");
   });
 
   it("delegates delete, toggle, drop-pin, and close", () => {

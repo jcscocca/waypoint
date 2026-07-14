@@ -24,9 +24,10 @@
 /* z-index ladder (all within the .mc-scope stacking root):
      6  panel query bar (sticky)      30  map fallback notice
     34  disclosure chip   35  attribution   40  legend
-    60  panel resize handle           80  modal scrim
+    60  panel resize handle
   1100  topbar · banner · error · empty-state · pin-drop helper · zoom control
-  1101  search-pill results           1200  workspace panel */
+  1101  search-pill results           1200  workspace panel
+  1300  modal scrim (a sibling of the drawer, so it must clear all of the above) */
 .mc-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
 
 .mc-map{position:absolute;inset:0;}
@@ -298,7 +299,7 @@
 .mc-scope{display:block;width:100%;height:100%;}
 .mc-frame{position:relative;width:100vw;height:100vh;overflow:hidden;background:var(--surface-sunken);border-radius:0;box-shadow:none;}
 
-.mc-modal-scrim{position:fixed;inset:0;z-index:80;background:rgba(20,24,28,.45);display:grid;place-items:center;padding:20px;}
+.mc-modal-scrim{position:fixed;inset:0;z-index:1300;background:rgba(20,24,28,.45);display:grid;place-items:center;padding:20px;}
 .mc-modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;}
 .mc-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .mc-modal-head h3{margin:0;font-size:16px;}

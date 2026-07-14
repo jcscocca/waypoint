@@ -92,6 +92,9 @@ export function ManagePlacesModal({
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
                 {addPinMode ? "Click map..." : "Drop pin"}
               </button>
+              {summary && summary.privacy.suppressed > 0 ? (
+                <span className="cnt" title="Hidden from public exports">{summary.privacy.suppressed} hidden</span>
+              ) : null}
             </div>
             {search}
             {places.length === 0 ? (

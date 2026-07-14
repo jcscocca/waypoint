@@ -495,7 +495,7 @@ export function MapWorkspace() {
             summary={data.summary}
             radiusM={analysis.radiusM}
             addPinMode={pinDraft.addPinMode}
-            search={<PlaceSearch provider={geocodingProvider} onSelectResult={pinDraft.handleSearchSelect} />}
+            search={<PlaceSearch provider={geocodingProvider} onSelectResult={(result) => { setManagePlaces(null); pinDraft.handleSearchSelect(result); }} />}
             initialView={managePlaces}
             onStartAddPin={() => { setManagePlaces(null); pinDraft.startAddPin(); }}
             onToggleSelect={handleToggleSelect}

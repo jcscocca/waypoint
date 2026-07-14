@@ -264,6 +264,27 @@ describe("MapWorkspace", () => {
     });
   });
 
+  it("closes the manage modal when its address search hands off to the draft flow", async () => {
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([home]));
+    geocodeSearch.mockResolvedValue([{ label: "500 Pine St", latitude: 47.615, longitude: -122.335, source: "test" }]);
+
+    render(<MapWorkspace />);
+    await screen.findByText("Home");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add or manage places" }));
+    expect(screen.getByRole("dialog", { name: "Manage places" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search an address or place"), { target: { value: "500 Pine" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByText("500 Pine St"));
+
+    // The scrim would hide the draft popover, so the handoff must close the modal first.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const analyzePanel = screen.getByRole("tabpanel", { name: "Analyze" });
+    expect(within(analyzePanel).getByRole("button", { name: /save pin/i })).toBeInTheDocument();
+  });
+
   it("marks the frame is-focus only when the drawer leaves less than the chrome minimum", async () => {
     vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
     vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary());
