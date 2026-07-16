@@ -458,6 +458,12 @@ git add frontend/src/lib/useCompareSet.ts frontend/src/lib/useCompareSet.test.ts
 git commit -m "feat(compare): single address list hook (saved + ad-hoc entries, persistence callback)"
 ```
 
+**Review amendments (applied post-commit, supersede the code block above):**
+1. `toggleSaved` upgrades a coordinate-colliding ad-hoc entry in place (stamps `savedPlaceId` + saved label) instead of append-then-dedupe silently dropping the stamp; toggle-off removes the upgraded entry whole.
+2. `entriesFromPlaces` and `toggleSaved` normalize coords (3 decimals) so `keyOf` comparisons hold regardless of stored precision.
+3. The saved-id notify effect is gated on `editedRef` — seeding never notifies (a pre-restore notify would mark the persisted selection dirty and skip the returning-session restore). **Task 5 relies on this:** `onSavedIdsChange` may be wired straight to `setSelectedIds` because only user edits fire it.
+4. Two extra tests (collision upgrade; seed-never-notifies). Hook suite is 10 tests; full suite 390.
+
 ---
 
 ## Task 3: The single run hook — extend `useCompare`
