@@ -11,7 +11,7 @@ import { decodeView, encodeView } from "../lib/savedView";
 import { useAnalyze } from "../lib/useAnalyze";
 import { useIncidentPoints } from "../lib/useIncidentPoints";
 import { useCompare } from "../lib/useCompare";
-import { useCompareSet } from "../lib/useCompareSet";
+import { useCompareSet, keyOf } from "../lib/useCompareSet";
 import { useDashboardData } from "../lib/useDashboardData";
 import { useDrawer } from "../lib/useDrawer";
 import { usePersistedSelection } from "../lib/usePersistedSelection";
@@ -122,6 +122,15 @@ export function MapWorkspace() {
   );
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
   const compareSet = useCompareSet(selected);
+  const savedPlaceKeys = useMemo(
+    () =>
+      new Set(
+        data.places
+          .filter((p) => p.latitude != null && p.longitude != null)
+          .map((p) => keyOf({ latitude: p.latitude as number, longitude: p.longitude as number, label: p.display_label })),
+      ),
+    [data.places],
+  );
 
   const analyze = useAnalyze({ selectedIds, analysis, refreshWithFallback: data.refreshWithFallback, setError: data.setError, points: sharedPoints ?? (lookupPoint ? [lookupPoint] : undefined) });
   const compare = useCompare({ selectedIds, analysis, setError: data.setError, points: compareSet.points });
@@ -521,6 +530,16 @@ export function MapWorkspace() {
               provider={geocodingProvider}
               onAddPoint={compareSet.add}
               onRemovePoint={compareSet.removeAt}
+              savedKeys={savedPlaceKeys}
+              onSavePoint={async (point) => {
+                data.setError("");
+                try {
+                  await createPlace({ display_label: point.label, latitude: point.latitude, longitude: point.longitude, visit_count: 1, sensitivity_class: "normal" });
+                  await data.refreshWithFallback("Saved, but your places list could not refresh.");
+                } catch {
+                  data.setError("Unable to save this address. Try again.");
+                }
+              }}
               analysis={analysis}
               comparison={compare.comparison}
               running={compare.running}

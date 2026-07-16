@@ -12,7 +12,7 @@ export interface CompareSet {
   removeAt: (index: number) => void;
 }
 
-function keyOf(p: ComparePoint): string {
+export function keyOf(p: ComparePoint): string {
   return `${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`;
 }
 
@@ -56,7 +56,15 @@ export function useCompareSet(seed: Place[]): CompareSet {
 
   function add(point: ComparePoint) {
     editedRef.current = true;
-    setPoints((cur) => dedupeCap([...cur, point]));
+    // Normalize to the backend's ~3-decimal place resolution (it generalizes saved coords for
+    // privacy), so a saved copy matches this point by keyOf — the row can flip to "Saved" and a
+    // second save won't create a duplicate.
+    const normalized: ComparePoint = {
+      ...point,
+      latitude: Number(point.latitude.toFixed(3)),
+      longitude: Number(point.longitude.toFixed(3)),
+    };
+    setPoints((cur) => dedupeCap([...cur, normalized]));
   }
 
   function removeAt(index: number) {

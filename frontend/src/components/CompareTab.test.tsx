@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CompareTab } from "./CompareTab";
 import type { GeocodingProvider } from "../lib/geocoding";
 import type { ComparePoint } from "../lib/useCompareSet";
+import { keyOf } from "../lib/useCompareSet";
 import type { AnalysisSettings, SiteComparison, SiteComparisonOption, SitePairwiseResult, SiteDecisionClass } from "../types";
 
 const provider: GeocodingProvider = { search: vi.fn().mockResolvedValue([]) };
@@ -27,7 +28,7 @@ const clearSweep: SiteComparison = {
 
 afterEach(cleanup);
 
-const base = { provider, onAddPoint: vi.fn(), onRemovePoint: vi.fn(), analysis, running: false, onRun: vi.fn() };
+const base = { provider, onAddPoint: vi.fn(), onRemovePoint: vi.fn(), savedKeys: new Set<string>(), onSavePoint: vi.fn(), analysis, running: false, onRun: vi.fn() };
 
 describe("CompareTab (editable set)", () => {
   it("empty set: prompts to add addresses and shows the add input", () => {
@@ -53,6 +54,17 @@ describe("CompareTab (editable set)", () => {
     expect(onRemovePoint).toHaveBeenCalledWith(0);
     fireEvent.click(screen.getByRole("button", { name: /compare addresses/i }));
     expect(onRun).toHaveBeenCalled();
+  });
+
+  it("offers Save for unsaved points, Saved for already-saved ones, and fires onSavePoint", () => {
+    const onSavePoint = vi.fn();
+    const points = setOf("Pike", "Bell");
+    render(<CompareTab {...base} savedKeys={new Set([keyOf(points[1])])} onSavePoint={onSavePoint} set={points} comparison={null} />);
+    const saveButtons = screen.getAllByRole("button", { name: /^save$/i });
+    expect(saveButtons).toHaveLength(1);
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+    fireEvent.click(saveButtons[0]);
+    expect(onSavePoint).toHaveBeenCalledWith(points[0]);
   });
 
   it("with a comparison: renders the slice-A ranked verdict", () => {

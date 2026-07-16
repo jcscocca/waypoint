@@ -4,7 +4,7 @@ import { toCompareVerdict } from "../lib/compareVerdict";
 import { incidentNoun } from "../lib/layerCopy";
 import type { GeocodingProvider } from "../lib/geocoding";
 import type { ComparePoint } from "../lib/useCompareSet";
-import { MAX_COMPARE_POINTS } from "../lib/useCompareSet";
+import { MAX_COMPARE_POINTS, keyOf } from "../lib/useCompareSet";
 import type { AnalysisSettings, SiteComparison } from "../types";
 import { CompareAddressInput } from "./CompareAddressInput";
 import { CompareRankedList } from "./CompareRankedList";
@@ -17,6 +17,9 @@ type Props = {
   provider: GeocodingProvider;
   onAddPoint: (point: ComparePoint) => void;
   onRemovePoint: (index: number) => void;
+  /** Coord keys of the user's saved places, so already-saved points show "Saved" not "Save". */
+  savedKeys: Set<string>;
+  onSavePoint: (point: ComparePoint) => void;
   analysis: AnalysisSettings;
   comparison: SiteComparison | null;
   running: boolean;
@@ -30,7 +33,7 @@ type Props = {
 const REVISED_CAVEAT =
   "Reported incident context, not a personal risk prediction. Results use reported Seattle incident data, which can be incomplete, delayed, corrected, or geographically generalized.";
 
-export function CompareTab({ set, provider, onAddPoint, onRemovePoint, analysis, comparison, running, onRun, onCopyLink, topSlot }: Props) {
+export function CompareTab({ set, provider, onAddPoint, onRemovePoint, savedKeys, onSavePoint, analysis, comparison, running, onRun, onCopyLink, topSlot }: Props) {
   const noun = incidentNoun(analysis.layer);
   const canRun = set.length >= 2 && !running;
   const verdict = comparison ? toCompareVerdict(comparison) : null;
@@ -51,6 +54,11 @@ export function CompareTab({ set, provider, onAddPoint, onRemovePoint, analysis,
               <li key={`${point.latitude},${point.longitude}`} className="mc-cmpset-row">
                 <span className="idx">{index + 1}</span>
                 <span className="lbl">{point.label}</span>
+                {savedKeys.has(keyOf(point)) ? (
+                  <span className="saved">Saved</span>
+                ) : (
+                  <button type="button" className="save" onClick={() => onSavePoint(point)}>Save</button>
+                )}
                 <button type="button" className="rm" aria-label={`Remove ${point.label}`} onClick={() => onRemovePoint(index)}>✕</button>
               </li>
             ))}
