@@ -133,7 +133,7 @@ export function MapWorkspace() {
   );
 
   const analyze = useAnalyze({ selectedIds, analysis, refreshWithFallback: data.refreshWithFallback, setError: data.setError, points: sharedPoints ?? (lookupPoint ? [lookupPoint] : undefined) });
-  const compare = useCompare({ selectedIds, analysis, setError: data.setError, points: compareSet.points });
+  const compare = useCompare({ entries: compareSet.points, analysis, setError: data.setError });
 
   // analyzed-beat highlight from the neighborhood payload
   const highlightBeats = useMemo(
@@ -148,7 +148,7 @@ export function MapWorkspace() {
   // (not just an empty tab) is what the recipient sees on load.
   useEffect(() => {
     if (!initialView) return;
-    if (initialView.points.length >= 2) void compare.runCompare();
+    if (initialView.points.length >= 2) void compare.run();
     else void analyze.runAnalyze();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -332,7 +332,7 @@ export function MapWorkspace() {
     // NOT own so a prior manual Analyze/Compare does not leave stale data for the new selection.
     if (effect.comparison !== undefined) {
       analyze.invalidate();
-      compare.applyAssistant(effect.comparison);
+      compare.applyAssistant({ comparison: effect.comparison });
     }
     if (effect.neighborhood !== undefined || effect.incidents !== undefined) {
       compare.invalidate();
@@ -544,7 +544,7 @@ export function MapWorkspace() {
               comparison={compare.comparison}
               neighborhood={compare.neighborhood}
               running={compare.running}
-              onRun={compare.runCompare}
+              onRun={compare.run}
               onCopyLink={() => buildShareUrl("compare")}
             />
           ) : null}
