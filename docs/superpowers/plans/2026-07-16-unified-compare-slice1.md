@@ -36,7 +36,7 @@ Create `frontend/src/components/PlaceContextCard.test.tsx`:
 ```tsx
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { PlaceContextCard } from "./PlaceContextCard";
@@ -95,9 +95,11 @@ describe("PlaceContextCard", () => {
 
   it("shows baseline analytics behind How we know", () => {
     renderCard();
-    expect(screen.getByText("How we know")).toBeInTheDocument();
-    expect(screen.getByText("Capitol Hill")).toBeInTheDocument();
-    expect(screen.getAllByText("0.002").length).toBeGreaterThan(0);
+    const summary = screen.getByText("How we know");
+    // Scope to the disclosure: the baseline label also appears in the interval plot.
+    const details = summary.closest("details")!;
+    expect(within(details).getByText("Capitol Hill")).toBeInTheDocument();
+    expect(within(details).getAllByText("0.002").length).toBeGreaterThan(0);
   });
 
   it("renders the temporal profile with the travel-window callout", () => {
