@@ -54,6 +54,8 @@ type Props = {
    * passes the live width.
    */
   panelWidthPx?: number;
+  /** True when rendered in the mobile bottom sheet; collapses the controls to a summary after a run. */
+  isMobile?: boolean;
   onChange: (patch: Partial<AnalysisSettings>) => void;
   onRun: () => void;
   onCopyLink?: () => string | null;
@@ -458,19 +460,27 @@ function IncidentDetailsCards({ details, noun, showCategory }: { details: Incide
   );
 }
 
-export function AnalyzeTab({ selected, analysis, availableRadii, running, incidentDetails, neighborhood, error, panelWidthPx, onChange, onRun, onCopyLink, onCompareWith, onSave, onHoverPlace, mcppPolygons, onFlyTo, topSlot }: Props) {
+export function AnalyzeTab({ selected, analysis, availableRadii, running, incidentDetails, neighborhood, error, panelWidthPx, isMobile = false, onChange, onRun, onCopyLink, onCompareWith, onSave, onHoverPlace, mcppPolygons, onFlyTo, topSlot }: Props) {
   const radii = availableRadii.length > 0 ? availableRadii : [250, 500, 1000];
 
   const resultsAnchorRef = useRef<HTMLDivElement>(null);
   const wasRunningRef = useRef(false);
+  // On the mobile sheet, collapse the controls to a summary once a run has produced results, so the
+  // tall control stack stops pushing the results off the visible fold. "Adjust" reopens them.
+  const [editingControls, setEditingControls] = useState(false);
   useEffect(() => {
-    // When a run finishes, scroll the results into view — on the mobile bottom sheet they
-    // otherwise render below the controls, off the visible fold.
     if (wasRunningRef.current && !running) {
-      resultsAnchorRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      if (isMobile) {
+        // Collapse the controls to a summary; results then sit near the top with no scroll needed
+        // (and the summary/Adjust row stays visible).
+        setEditingControls(false);
+      } else {
+        // Desktop keeps the full controls, so scroll the results past them into view.
+        resultsAnchorRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      }
     }
     wasRunningRef.current = running;
-  }, [running]);
+  }, [running, isMobile]);
 
   function coordsFor(place: NeighborhoodPlace, index: number): { latitude: number; longitude: number } | null {
     const match = selected.find((p) => p.id === place.place_id) ?? selected[index];
@@ -496,10 +506,13 @@ export function AnalyzeTab({ selected, analysis, availableRadii, running, incide
   const showCategory = analysis.layer !== "calls"; // reported + arrests carry offense categories; 911 calls do not
   const subcategoryHeader = isCallsLayer ? "Call type" : isArrestsLayer ? "Charge" : "Subcategory";
   const noun = incidentNoun(analysis.layer);
+  const categoryLabel = CATEGORIES.find((c) => c.value === analysis.offenseCategory)?.label ?? "All reported";
+  const showFullControls = !isMobile || !neighborhood || editingControls;
 
   return (
     <div className="mc-panel is-active has-querybar" role="tabpanel" aria-label="Analyze">
       {topSlot}
+      {showFullControls ? (
       <div className="mc-querybar">
         <div className="mc-field">
           <label htmlFor="analysis-start-date">Date range</label>
@@ -538,6 +551,12 @@ export function AnalyzeTab({ selected, analysis, availableRadii, running, incide
           <button type="button" className="mc-cta" disabled={!canRun} onClick={onRun}>{running ? "Running…" : "Run analysis"}</button>
         </div>
       </div>
+      ) : (
+      <div className="mc-querybar-summary">
+        <span className="mc-querybar-sum">{selected.length} place{selected.length === 1 ? "" : "s"} · {analysis.radiusM} m{showCategory ? ` · ${categoryLabel}` : ""}</span>
+        <button type="button" className="mc-querybar-edit" onClick={() => setEditingControls(true)}>Adjust</button>
+      </div>
+      )}
 
       <div ref={resultsAnchorRef} aria-hidden="true" />
 

@@ -503,6 +503,7 @@ export function MapWorkspace() {
               neighborhood={analyze.neighborhood}
               error={data.error}
               panelWidthPx={drawer.widthPx}
+              isMobile={isMobile}
               onChange={handleAnalysisChange}
               onRun={analyze.runAnalyze}
               onCopyLink={() => buildShareUrl("analyze")}

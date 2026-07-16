@@ -457,6 +457,11 @@ input.mc-inp:focus{outline:2px solid var(--accent);outline-offset:1px;}
   .mc-head-actions{justify-content:flex-start;}
   .mc-search{height:auto;min-height:44px;}
   .mc-search-go{height:34px;}
+
+  /* After a run, the parameter controls collapse to this one-line summary so results own the sheet. */
+  .mc-querybar-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0 12px;margin-bottom:4px;border-bottom:1px solid var(--border);}
+  .mc-querybar-sum{min-width:0;font-size:12.5px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mc-querybar-edit{flex:none;height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font:inherit;font-size:12.5px;cursor:pointer;}
 }
 @keyframes sheetin{from{transform:translateY(100%);}to{transform:translateY(0);}}
 .mc-vchip{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.02em;padding:2px 9px;border-radius:20px;border:1px solid var(--border);color:var(--text);background:var(--surface-sunken);}
