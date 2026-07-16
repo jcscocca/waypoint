@@ -108,6 +108,37 @@ describe("CompareTab (unified panel)", () => {
     expect(screen.queryByTestId("compare-ranked")).not.toBeInTheDocument();
   });
 
+  it("renders every address's module full-width when the comparison is unavailable, without key warnings", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<CompareTab {...base} entries={entriesOf("Pike", "Bell")} neighborhood={twoPlaceNeighborhood} runPoints={entriesOf("Pike", "Bell")} />);
+    expect(screen.getByLabelText("Context for Pike")).toBeInTheDocument();
+    expect(screen.getByLabelText("Context for Bell")).toBeInTheDocument();
+    expect(screen.queryByTestId("compare-ranked")).not.toBeInTheDocument();
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("translates module hover to the entry's savedPlaceId", () => {
+    const onHoverPlace = vi.fn();
+    const saved = entriesOf("Pike").map((e) => ({ ...e, savedPlaceId: "sp1" }));
+    render(<CompareTab {...base} entries={saved} onHoverPlace={onHoverPlace} neighborhood={onePlaceNeighborhood} runPoints={saved} />);
+    fireEvent.mouseEnter(screen.getByLabelText("Context for Pike"));
+    expect(onHoverPlace).toHaveBeenCalledWith("sp1");
+    fireEvent.mouseLeave(screen.getByLabelText("Context for Pike"));
+    expect(onHoverPlace).toHaveBeenLastCalledWith(null);
+  });
+
+  it("copies the share link when results exist", async () => {
+    // clipboard mock per AnalyzeTab.test.tsx's copy-link test idiom
+    const writeText = vi.fn();
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const onCopyLink = vi.fn().mockReturnValue("https://example.test/?view=abc");
+    render(<CompareTab {...base} entries={entriesOf("Pike")} neighborhood={onePlaceNeighborhood} runPoints={entriesOf("Pike")} onCopyLink={onCopyLink} />);
+    fireEvent.click(screen.getByRole("button", { name: /copy link to this view/i }));
+    expect(onCopyLink).toHaveBeenCalled();
+    expect(writeText).toHaveBeenCalledWith("https://example.test/?view=abc");
+  });
+
   it("N=2 result: callout + spine + expansions joined by index", () => {
     render(<CompareTab {...base} entries={entriesOf("Pike", "Bell")} comparison={clearSweep} neighborhood={twoPlaceNeighborhood} runPoints={entriesOf("Pike", "Bell")} />);
     expect(screen.getByText(/statistically lower than every other/i)).toBeInTheDocument();
