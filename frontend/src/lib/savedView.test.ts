@@ -64,6 +64,16 @@ describe("savedView", () => {
     expect(wire.pts).toHaveLength(1);
   });
 
+  it("decodes a hand-built wire object that omits the tab key (tab-free format)", () => {
+    const wire = btoa(unescape(encodeURIComponent(JSON.stringify({
+      v: 1, r: 250, s: "2026-01-01", e: "2026-06-30", ly: "reported",
+      pts: [{ y: 47.6, x: -122.33, l: "Home" }], c: null,
+    })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const view = decodeView(wire);
+    expect(view).not.toBeNull();
+    expect(view!.points[0].label).toBe("Home");
+  });
+
   it("decodes a legacy tab=analyze link onto the unified view", () => {
     const legacy = btoa(unescape(encodeURIComponent(JSON.stringify({
       v: 1, t: "analyze", r: 250, s: "2026-01-01", e: "2026-06-30", ly: "reported",

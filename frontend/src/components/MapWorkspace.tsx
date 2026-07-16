@@ -280,6 +280,7 @@ export function MapWorkspace() {
       if (mode === "clear") list.replaceAll([]);
       else if (mode === "replace") list.replaceAll(entriesForIds(ids));
       else entriesForIds(ids).forEach((entry) => list.add(entry));
+      if (mode === "clear") compare.invalidate();
     }
     if (effect.comparison !== undefined) {
       compare.applyAssistant({ comparison: effect.comparison });
