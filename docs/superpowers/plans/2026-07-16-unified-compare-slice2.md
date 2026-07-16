@@ -1693,6 +1693,8 @@ git commit -m "feat(compare): one address list drives the workspace; tabs collap
 
 (Committing with red tests is deliberate here — Task 6 lands the test migration in the very next commit; the PR is reviewed as a unit and the gate runs before push.)
 
+**Review amendments (applied post-commit):** `handleDelete` also removes the deleted place's list entry (a dangling `savedPlaceId` would poison the next run's `place_ids` refresh — the backend rejects unknown ids). Task 6 adds the regression test. `usePinDraft` had THREE `setActiveTab("analyze")` calls (startAddPin, handleMapClick, handleSearchSelect — not saveDraft); all three retargeted.
+
 ---
 
 ## Task 6: Test migration — workspace, bridge, bottom sheet, app
