@@ -110,6 +110,18 @@ export function CompareTab({ entries, provider, onAddEntry, onRemoveEntry, saved
 
   const verdict = comparison ? toCompareVerdict(comparison) : null;
 
+  // Announce what the results actually contain — on the assistant path runPoints is
+  // null and entries can lag behind the created ids, so input state can miscount.
+  const announcedCount = comparison
+    ? comparison.analytical.options.length
+    : runPoints?.length ?? neighborhood?.places?.length ?? entries.length;
+  const announcedNoun = announcedCount === 1 ? "address" : "addresses";
+  const runAnnouncement = !running && hasResults
+    ? comparison
+      ? `Comparison complete: ${announcedCount} ${announcedNoun} ranked by ${noun.singular} rate.`
+      : `Analysis complete for ${announcedCount} ${announcedNoun}.`
+    : "";
+
   function moduleFor(index: number): ReactNode | null {
     const place = neighborhood?.places?.[index];
     if (!place || !neighborhood) return null;
@@ -219,11 +231,7 @@ export function CompareTab({ entries, provider, onAddEntry, onRemoveEntry, saved
       <div ref={resultsAnchorRef} aria-hidden="true" />
 
       <p className="mc-sr" data-testid="run-announcement" role="status" aria-live="polite">
-        {!running && hasResults
-          ? comparison
-            ? `Comparison complete: ${runPoints?.length ?? entries.length} addresses ranked by ${noun.singular} rate.`
-            : `Analysis complete for ${runPoints?.length ?? entries.length} ${(runPoints?.length ?? entries.length) === 1 ? "address" : "addresses"}.`
-          : ""}
+        {runAnnouncement}
       </p>
 
       {isCallsLayer ? (

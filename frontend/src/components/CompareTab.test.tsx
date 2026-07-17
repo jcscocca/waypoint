@@ -173,6 +173,17 @@ describe("CompareTab (unified panel)", () => {
     expect(screen.getByTestId("run-announcement")).toHaveTextContent("");
   });
 
+  it("announcement counts the announced payload, not the input list", () => {
+    const threeOptions = [opt("p1", "Pike", 12, 3.9), opt("p2", "Bell", 31, 10.1), opt("p3", "Yesler", 44, 14.3)];
+    const threeWay: SiteComparison = {
+      ...clearSweep,
+      overview: { ...clearSweep.overview, decision_class: "not_statistically_clear", recommendation_option_id: null, recommendation_label: null, options: threeOptions },
+      analytical: { ...clearSweep.analytical, options: threeOptions, pairwise_results: [pair("p1", "p2", "not_statistically_clear", null), pair("p1", "p3", "not_statistically_clear", null)] },
+    };
+    render(<CompareTab {...base} entries={entriesOf("Pike", "Bell")} comparison={threeWay} neighborhood={twoPlaceNeighborhood} runPoints={null} />);
+    expect(screen.getByTestId("run-announcement")).toHaveTextContent("Comparison complete: 3 addresses ranked by reported incident rate.");
+  });
+
   it("N=2 result: callout + spine + expansions joined by index", () => {
     render(<CompareTab {...base} entries={entriesOf("Pike", "Bell")} comparison={clearSweep} neighborhood={twoPlaceNeighborhood} runPoints={entriesOf("Pike", "Bell")} />);
     expect(screen.getByText(/statistically lower than every other/i)).toBeInTheDocument();
