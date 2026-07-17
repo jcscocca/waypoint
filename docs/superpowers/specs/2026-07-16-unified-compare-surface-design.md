@@ -76,11 +76,12 @@ doing the differentiation work).
   surface always sends `points` — no backend change, and the constraint never bites.
   Nothing downstream depends on server place ids: hover-linking and letters work by
   index within one response; Save/Export live off the saved-places store.
-- **Run = 1 or 2 calls.** N=1 → neighborhood analysis only. N≥2 → neighborhood analysis
-  + `/dashboard/compare` in parallel behind one loading state; results render when both
-  resolve (spine from the compare payload; expansions and the incident disclosure from
-  the analysis payload). If one call fails, render the sections the other payload
-  supports and show the existing inline error for the rest.
+- **Run = 2–4 parallel calls** (see the recorded deltas): neighborhood analysis +
+  incident details always; `/dashboard/compare` at N≥2; a `place_ids` summary refresh
+  when saved entries exist. One loading state; results render when all settle (spine
+  from the compare payload; expansions and the incident disclosure from the analysis
+  payload). Only the primary payload's failure (compare at N≥2, neighborhood at N=1)
+  surfaces the inline error; secondary failures degrade their sections silently.
 - **Share links.** One `points`-based format without the `tab=` discriminator. Legacy
   `tab=analyze` and `tab=compare` links keep decoding onto the unified surface and
   auto-run.

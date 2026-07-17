@@ -177,7 +177,7 @@ slices.
   bridge and pin/lookup/manage flows retargeted. Plan:
   `docs/superpowers/plans/2026-07-16-unified-compare-slice2.md`.
 - [ ] **Slice 3 — polish** — mobile tuning (adaptive CTA shipped early, in slice 2);
-  review-accumulated: ranked-row↔map hover linkage at N≥2, aria-live results
+  review-accumulated: ranked-row↔map hover linkage at N≥2 (incl. assistant-applied panes, which lose hover via the nulled runPoints), pending-id list appends without invalidation, aria-live results
   announcement, clipboard-failure feedback on Copy link, pre-load banner-Exit corner,
   `useCompareSet.ts` → `useAddressList.ts` rename, map pins for ad-hoc entries; later
   optional: pin-to-compare columns, progressive spine-first rendering.
