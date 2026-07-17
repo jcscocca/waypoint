@@ -154,6 +154,25 @@ describe("CompareTab (unified panel)", () => {
     expect(status).toHaveTextContent("");
   });
 
+  it("announces completion politely: comparison wording at 2+", () => {
+    render(<CompareTab {...base} entries={entriesOf("Pike", "Bell")} comparison={clearSweep} neighborhood={twoPlaceNeighborhood} runPoints={entriesOf("Pike", "Bell")} />);
+    const region = screen.getByTestId("run-announcement");
+    expect(region).toHaveAttribute("aria-live", "polite");
+    expect(region).toHaveTextContent("Comparison complete: 2 addresses ranked by reported incident rate.");
+  });
+
+  it("announces completion politely: analysis wording at 1", () => {
+    render(<CompareTab {...base} entries={entriesOf("Pike")} neighborhood={onePlaceNeighborhood} runPoints={entriesOf("Pike")} />);
+    expect(screen.getByTestId("run-announcement")).toHaveTextContent("Analysis complete for 1 address.");
+  });
+
+  it("announcement is empty while running and before any run", () => {
+    const { rerender } = render(<CompareTab {...base} entries={entriesOf("Pike")} />);
+    expect(screen.getByTestId("run-announcement")).toHaveTextContent("");
+    rerender(<CompareTab {...base} entries={entriesOf("Pike")} running />);
+    expect(screen.getByTestId("run-announcement")).toHaveTextContent("");
+  });
+
   it("N=2 result: callout + spine + expansions joined by index", () => {
     render(<CompareTab {...base} entries={entriesOf("Pike", "Bell")} comparison={clearSweep} neighborhood={twoPlaceNeighborhood} runPoints={entriesOf("Pike", "Bell")} />);
     expect(screen.getByText(/statistically lower than every other/i)).toBeInTheDocument();

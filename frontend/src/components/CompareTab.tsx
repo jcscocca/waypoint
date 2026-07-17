@@ -218,6 +218,14 @@ export function CompareTab({ entries, provider, onAddEntry, onRemoveEntry, saved
 
       <div ref={resultsAnchorRef} aria-hidden="true" />
 
+      <p className="mc-sr" data-testid="run-announcement" role="status" aria-live="polite">
+        {!running && hasResults
+          ? comparison
+            ? `Comparison complete: ${runPoints?.length ?? entries.length} addresses ranked by ${noun.singular} rate.`
+            : `Analysis complete for ${runPoints?.length ?? entries.length} ${(runPoints?.length ?? entries.length) === 1 ? "address" : "addresses"}.`
+          : ""}
+      </p>
+
       {isCallsLayer ? (
         <p className="mc-layer-note" role="note">
           911 calls are <strong>requests for service</strong>, not confirmed incidents. The same
