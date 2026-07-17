@@ -244,6 +244,37 @@ no visible gain. **Decision: do not subtract; state the bound.** This decision s
 revisited if trends are ever computed for large sub-geographies (e.g. whole precincts,
 share ≥ 10%).
 
+### 5.3.1 Series-universe mismatch (A ⊆ C is not exact)
+
+`C_t = A_t + B_t` (§5.3) additionally assumes the two series are bucketed on the same
+universe of rows. They are not: the area series buckets on the `CrimeIncident.mcpp`
+**attribute** (`trends_for_mcpp`, `column=CrimeIncident.mcpp`), while the citywide series
+sums rows whose `CrimeIncident.beat` is in the vendored beat-area list
+(`_beat_names()` ← `load_beat_areas()`, `app/services/trends_service.py`) — the same
+geographic-beats-only list `beat_baselines.py` uses for beat exposure areas, which excludes
+non-geographic/placeholder beat values. A row with a valid `mcpp` but a beat outside that
+list (or blank) is counted in `A_t` but not in `C_t`: it enters the area series without
+entering its own denominator, biasing `k = ΣA/ΣC` upward by at most the mismatch's share of
+citywide volume.
+
+Measured directly against the live source (2026-07-17, `data.seattle.gov`) over the
+production windows: crime layer (`tazs-3rd5`), rows with a valid neighborhood since
+2021-07, 1 mismatched row of ≈399,000 (the sole `beat = '-'` row; the 4 `beat = '99'` rows
+*are* in the vendored list and so are already counted citywide); calls layer (`33kz-ixgy`),
+rows with a valid dispatch neighborhood since 2024-07, 45 mismatched rows of ≈1,150,000
+across eight non-geographic beat codes (`SP`, `E`, `CTY`, `INV`, `SPVDD`, `H3`, `N`, `S`).
+Both ratios are ≤ 0.005% — several orders of magnitude below the ≈±10–15% anchor sampling
+noise quantified in §3.3, so the bias this mismatch adds to `k` is not distinguishable from
+zero at any practical precision.
+
+**Decision: universes deliberately not aligned; state the bound instead of reconciling the
+predicates.** Reconciling them (e.g. bucketing the citywide series on `mcpp` too, or
+filtering the area series to beats in the vendored list) would trade a negligible, measured
+bias for extra query complexity and a second dependency between the two series. Revisit only
+if the source's beat/mcpp tagging quality degrades enough to move the mismatch share
+materially — e.g. a data-provider change that stops populating `beat` for a large slice of
+rows.
+
 ### 5.4 Geography basis
 
 Area counts are bucketed by the source's `mcpp` **attribute** (`CrimeIncident.mcpp`), not

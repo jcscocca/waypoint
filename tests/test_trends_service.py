@@ -118,3 +118,38 @@ def test_cache_hit_and_reset(seeded_session):
                              offense_category=None, today=TODAY, now=clock)
     assert second is first                     # served from cache
     reset_trends_cache()
+
+
+def test_placeholder_beat_enters_area_series_but_not_citywide(tmp_path):
+    # Documented, deliberate behavior: the area series buckets on mcpp while the
+    # citywide series buckets on beat-in-vendored-list, so a valid-mcpp row with a
+    # placeholder beat lands in area_counts but not citywide_counts. Measured bound
+    # in trend-indexing-method.md §5.3.1 ("Series-universe mismatch").
+    create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'trends_mismatch.sqlite3'}")
+    session = get_sessionmaker()()
+    session.add_all(
+        [
+            # Valid mcpp, placeholder beat -> counts toward TEST HILL, not citywide.
+            CrimeIncident(
+                id="m1", offense_start_utc=datetime(2026, 4, 10, tzinfo=UTC),
+                offense_category="PROPERTY", beat="-", mcpp="TEST HILL",
+                latitude=47.60945, longitude=-122.33595,
+            ),
+            # Normal row, same month, real beat -> counts toward both.
+            CrimeIncident(
+                id="m2", offense_start_utc=datetime(2026, 4, 15, tzinfo=UTC),
+                offense_category="PROPERTY", beat="M3", mcpp="TEST HILL",
+                latitude=47.60945, longitude=-122.33595,
+            ),
+        ]
+    )
+    session.commit()
+    payload = trends_for_mcpp(
+        session, mcpp="TEST HILL", layer="reported", offense_category=None, today=TODAY,
+    )
+    months = payload["months"]
+    area = dict(zip(months, payload["area_counts"], strict=True))
+    city = dict(zip(months, payload["citywide_counts"], strict=True))
+    assert area["2026-04"] == 2       # both rows bucket by mcpp
+    assert city["2026-04"] == 1       # only the real-beat row counts citywide
+    session.close()
