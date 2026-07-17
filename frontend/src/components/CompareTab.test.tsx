@@ -128,15 +128,30 @@ describe("CompareTab (unified panel)", () => {
     expect(onHoverPlace).toHaveBeenLastCalledWith(null);
   });
 
-  it("copies the share link when results exist", async () => {
-    // clipboard idiom: define writeText mock via Object.defineProperty
-    const writeText = vi.fn();
+  it("copies the share link and confirms with a transient status", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     const onCopyLink = vi.fn().mockReturnValue("https://example.test/?view=abc");
     render(<CompareTab {...base} entries={entriesOf("Pike")} neighborhood={onePlaceNeighborhood} runPoints={entriesOf("Pike")} onCopyLink={onCopyLink} />);
     fireEvent.click(screen.getByRole("button", { name: /copy link to this view/i }));
-    expect(onCopyLink).toHaveBeenCalled();
     expect(writeText).toHaveBeenCalledWith("https://example.test/?view=abc");
+    expect(await screen.findByText("Copied")).toBeInTheDocument();
+  });
+
+  it("reports a clipboard failure instead of rejecting silently", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const onCopyLink = vi.fn().mockReturnValue("https://example.test/?view=abc");
+    render(<CompareTab {...base} entries={entriesOf("Pike")} neighborhood={onePlaceNeighborhood} runPoints={entriesOf("Pike")} onCopyLink={onCopyLink} />);
+    fireEvent.click(screen.getByRole("button", { name: /copy link to this view/i }));
+    expect(await screen.findByText("Couldn't copy — try again.")).toBeInTheDocument();
+  });
+
+  it("copy status region is polite live and empty at rest", () => {
+    render(<CompareTab {...base} entries={entriesOf("Pike")} neighborhood={onePlaceNeighborhood} runPoints={entriesOf("Pike")} onCopyLink={() => "u"} />);
+    const status = screen.getByTestId("copy-status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveTextContent("");
   });
 
   it("N=2 result: callout + spine + expansions joined by index", () => {

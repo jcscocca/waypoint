@@ -70,6 +70,14 @@ export function CompareTab({ entries, provider, onAddEntry, onRemoveEntry, saved
   const resultsAnchorRef = useRef<HTMLDivElement>(null);
   const wasRunningRef = useRef(false);
   const [editingControls, setEditingControls] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const copyResetRef = useRef<number | null>(null);
+  useEffect(() => () => { if (copyResetRef.current !== null) window.clearTimeout(copyResetRef.current); }, []);
+  function flashCopyState(next: "copied" | "failed") {
+    setCopyState(next);
+    if (copyResetRef.current !== null) window.clearTimeout(copyResetRef.current);
+    copyResetRef.current = window.setTimeout(() => setCopyState("idle"), 2000);
+  }
   useEffect(() => {
     if (wasRunningRef.current && !running) {
       if (isMobile) {
@@ -243,11 +251,20 @@ export function CompareTab({ entries, provider, onAddEntry, onRemoveEntry, saved
                 className="mc-link-copy"
                 onClick={async () => {
                   const url = onCopyLink();
-                  if (url) await navigator.clipboard.writeText(url);
+                  if (!url) return;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    flashCopyState("copied");
+                  } catch {
+                    flashCopyState("failed");
+                  }
                 }}
               >
                 Copy link to this view
               </button>
+              <span className="mc-copy-status" data-testid="copy-status" role="status" aria-live="polite">
+                {copyState === "copied" ? "Copied" : copyState === "failed" ? "Couldn't copy — try again." : ""}
+              </span>
             </div>
           ) : null}
 
