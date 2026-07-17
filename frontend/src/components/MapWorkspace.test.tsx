@@ -1105,8 +1105,57 @@ describe("MapWorkspace", () => {
     // under the fresh results, so it must invalidate the now-stale spine.
     resolveSummary(makeSummary([home, work, pin9]));
     await waitFor(() => expect(screen.queryByTestId("compare-ranked")).not.toBeInTheDocument());
-    // Scoped: the chip strip also renders "Pin 9" once the summary lands.
+    // The chip strip renders the same label once the summary lands, so scope to the address rows.
     const rows = screen.getByRole("list", { name: /addresses to compare/i });
     expect(await within(rows).findByText("Pin 9")).toBeInTheDocument();
+  });
+
+  it("keeps an assistant-applied comparison when its refetch resolves a queued place id", async () => {
+    // compare-by-name: the backend creates the unsaved place and returns its id, so the
+    // bridge's replace queues an id that data.places can't resolve yet. The tool effect's
+    // own summary refetch delivers it — and that resolve-append must NOT drop the applied
+    // pane (runPoints === null: assistant results aren't keyed to this list).
+    const pike: Place = { ...home, id: "p9", display_label: "Pike Street", latitude: 47.63, longitude: -122.35 };
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([home, work]));
+    vi.mocked(streamAssistantChat).mockImplementation(async (_payload, handlers) => {
+      handlers.onEvent({
+        event: "tool",
+        data: {
+          tool_name: "compare_places",
+          result: {
+            place_ids: ["p1", "p2", "p9"],
+            settings_used: {
+              radius_m: 250,
+              analysis_start_date: "2026-01-01",
+              analysis_end_date: "2026-06-30",
+              offense_category: null,
+            },
+            comparison: makeSiteComparison("Home", "Work"),
+          },
+        },
+      });
+      handlers.onEvent({ event: "done", data: {} });
+    });
+
+    render(<MapWorkspace />);
+    await screen.findByRole("checkbox", { name: "Home" });
+    // Let the greet run's own summary refresh land first, so the deferred below is
+    // consumed by the tool effect's refetch and nothing else.
+    await waitFor(() => expect(getDashboardSummary).toHaveBeenCalledTimes(2));
+    let resolveSummary!: (value: DashboardSummary) => void;
+    vi.mocked(getDashboardSummary).mockReturnValueOnce(new Promise<DashboardSummary>((resolve) => { resolveSummary = resolve; }));
+
+    fireEvent.change(screen.getByLabelText("Analyst message"), { target: { value: "compare with Pike Street" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    // The applied pane renders while p9 is still pending resolution.
+    expect(await screen.findByTestId("compare-ranked")).toBeInTheDocument();
+
+    // The refetch lands WITH p9's place: the row appends and the pane survives.
+    resolveSummary(makeSummary([home, work, pike]));
+    const rows = screen.getByRole("list", { name: /addresses to compare/i });
+    expect(await within(rows).findByText("Pike Street")).toBeInTheDocument();
+    expect(screen.getByTestId("compare-ranked")).toBeInTheDocument();
   });
 });

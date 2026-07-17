@@ -192,8 +192,9 @@ export function MapWorkspace() {
     pendingIdsRef.current = [];
     const resolved = entriesForIds(pending);
     if (resolved.length > 0) {
-      // A late-resolving entry changes the list under existing results.
-      invalidateAnalysisContext();
+      // Run results are keyed to the list, so a late append makes them stale;
+      // assistant-applied panes (runPoints === null) are decoupled and must survive.
+      if (compare.runPoints !== null) invalidateAnalysisContext();
       resolved.forEach((entry) => list.add(entry));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
