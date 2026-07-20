@@ -66,6 +66,7 @@ vi.mock("../lib/geocoding", async (importOriginal) => ({
 import { MapWorkspace } from "./MapWorkspace";
 import { analyzePlaces, comparePlaces, createBulkPlaces, createPlace, createSession, deletePlace, getDashboardSummary, getIncidentDetails, getMcppPolygons, getNeighborhoodAnalysis, streamAssistantChat, streamAssistantCommand, updatePlace } from "../api/client";
 import { currentYearAnalysisWindow } from "../lib/analysisDefaults";
+import { snapHeightPx } from "../lib/drawer";
 import { encodeView } from "../lib/savedView";
 import { keyOf } from "../lib/useAddressList";
 import type { DashboardSummary, IncidentDetailsResponse, NeighborhoodAnalysis, Place, SiteComparison } from "../types";
@@ -407,6 +408,22 @@ describe("MapWorkspace", () => {
     expect(container.querySelector(".mc-frame")).not.toHaveClass("is-placing-pin");
     expect(container.querySelector(".mc-workspace-panel")).toHaveClass("is-open");
     expect(screen.getByLabelText(/label/i)).toBeInTheDocument();
+  });
+
+  it("narrow viewport: arming add-pin drops the sheet to bar, and a map click raises it to half", async () => {
+    window.innerWidth = 400;
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary());
+
+    const { container } = render(<MapWorkspace />);
+    await screen.findByText(/point me at a place/i);
+    expect(container.querySelector(".mc-workspace-panel")).toHaveClass("is-half");
+
+    fireEvent.click(screen.getByRole("button", { name: "Drop a pin on the map" }));
+    expect(container.querySelector(".mc-workspace-panel")).toHaveClass("is-bar");
+
+    fireEvent.click(screen.getByTestId("fire-map-click"));
+    expect(container.querySelector(".mc-workspace-panel")).toHaveClass("is-half");
   });
 
   it("runs analysis for a selected place", async () => {
@@ -1520,6 +1537,18 @@ describe("MapWorkspace", () => {
     expect(widthNow()).toBe("400px");
   });
 
+  it("narrow viewport: expanding a card raises the sheet to full, collapsing restores half", async () => {
+    window.innerWidth = 400;
+    const { container } = await renderWithAnalyzeCard(analyzeCardResult());
+    const panel = () => container.querySelector(".mc-workspace-panel") as HTMLElement;
+
+    expect(panel()).toHaveClass("is-half");
+    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
+    expect(panel()).toHaveClass("is-full");
+    fireEvent.click(screen.getByRole("button", { name: "Collapse" }));
+    expect(panel()).toHaveClass("is-half");
+  });
+
   it("the card export link carries the run-scoped run_id", async () => {
     await renderWithAnalyzeCard(analyzeCardResult({ analysis_run_id: "run-xyz" }));
     const link = screen.getByRole("link", { name: "Export CSV" });
@@ -1548,6 +1577,30 @@ describe("MapWorkspace", () => {
     expect(fit.padding).toEqual({ top: 90, left: 40, right: 440, bottom: 40 });
   });
 
+  it("narrow viewport: fitTo bottom inset tracks the sheet's snap (bar vs half)", async () => {
+    window.innerWidth = 400;
+
+    // Default state: not collapsed, snap "half".
+    const half = await renderWithAnalyzeCard(analyzeCardResult({ badges: [badge("a", "Alpha")] }));
+    await screen.findByTestId("badge-a");
+    const halfFit = fitToCaptures.at(-1) as { padding: { bottom: number } };
+    expect(halfFit.padding.bottom).toBe(snapHeightPx("half", window.innerHeight));
+    half.unmount();
+
+    try {
+      localStorage.setItem("compcat.drawer.collapsed", "true");
+      localStorage.setItem("compcat.drawer.snap", "bar");
+      fitToCaptures.length = 0;
+      await renderWithAnalyzeCard(analyzeCardResult({ badges: [badge("a", "Alpha")] }));
+      await screen.findByTestId("badge-a");
+      const barFit = fitToCaptures.at(-1) as { padding: { bottom: number } };
+      expect(barFit.padding.bottom).toBe(snapHeightPx("bar", window.innerHeight));
+    } finally {
+      localStorage.removeItem("compcat.drawer.collapsed");
+      localStorage.removeItem("compcat.drawer.snap");
+    }
+  });
+
   it("tapping a presence badge focuses the newest matching card and shows the rail", async () => {
     await renderWithAnalyzeCard(analyzeCardResult({ badges: [badge("a", "Alpha")] }));
     expect(await screen.findByTestId("badge-a")).toBeInTheDocument();
@@ -1563,6 +1616,24 @@ describe("MapWorkspace", () => {
     // The rail returns (composer present) and the panel scrolls the matching card into view.
     expect(await screen.findByLabelText("Analyst message")).toBeInTheDocument();
     await waitFor(() => expect(scrollSpy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" }));
+  });
+
+  it("narrow viewport: tapping a presence badge on a bar sheet raises it to half", async () => {
+    window.innerWidth = 400;
+    localStorage.setItem("compcat.drawer.collapsed", "true");
+    localStorage.setItem("compcat.drawer.snap", "bar");
+    try {
+      const { container } = await renderWithAnalyzeCard(analyzeCardResult({ badges: [badge("a", "Alpha")] }));
+      expect(await screen.findByTestId("badge-a")).toBeInTheDocument();
+      expect(container.querySelector(".mc-workspace-panel")).toHaveClass("is-bar");
+
+      fireEvent.click(screen.getByTestId("badge-a"));
+
+      expect(container.querySelector(".mc-workspace-panel")).toHaveClass("is-half");
+    } finally {
+      localStorage.removeItem("compcat.drawer.collapsed");
+      localStorage.removeItem("compcat.drawer.snap");
+    }
   });
 
   it("clears presence badges when the analysis context changes via the strip", async () => {
@@ -1773,6 +1844,37 @@ describe("MapWorkspace", () => {
     expect(screen.getByRole("button", { name: "Compare these 2 places" })).toBeInTheDocument();
     expect(analyzePlaces).not.toHaveBeenCalled();
     expect(comparePlaces).not.toHaveBeenCalled();
+  });
+
+  it("narrow viewport: an offer minted after a bulk import raises the sheet from bar to half", async () => {
+    window.innerWidth = 400;
+    localStorage.setItem("compcat.drawer.collapsed", "true");
+    localStorage.setItem("compcat.drawer.snap", "bar");
+    try {
+      vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+      vi.mocked(getDashboardSummary).mockResolvedValueOnce(makeSummary()).mockResolvedValue(makeSummary([home, work]));
+      vi.mocked(createBulkPlaces).mockResolvedValue({ created_count: 2, skipped_count: 0, places: [home, work] });
+
+      const { container } = render(<MapWorkspace />);
+      await screen.findByRole("button", { name: "Add places manually" });
+      expect(container.querySelector(".mc-workspace-panel")).toHaveClass("is-bar");
+
+      fireEvent.click(screen.getByRole("button", { name: /add places manually/i }));
+      fireEvent.click(screen.getByRole("button", { name: "Bulk CSV" }));
+      fireEvent.change(screen.getByLabelText("CSV rows"), {
+        target: { value: "display_label,latitude,longitude\nHome,47.61,-122.33\nWork,47.62,-122.34" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /import rows/i }));
+
+      await screen.findByRole("checkbox", { name: "Select Home" });
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+      expect(await screen.findByText("Saved 2 places. Want me to compare them?")).toBeInTheDocument();
+      expect(container.querySelector(".mc-workspace-panel")).toHaveClass("is-half");
+    } finally {
+      localStorage.removeItem("compcat.drawer.collapsed");
+      localStorage.removeItem("compcat.drawer.snap");
+    }
   });
 
   it("share-link mount auto-runs exactly once and fires no place-added offer", async () => {

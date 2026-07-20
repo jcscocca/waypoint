@@ -7,7 +7,7 @@ import { describeAnalysisPatch } from "../lib/analysisReceipt";
 import { interpretToolResult } from "../lib/assistantBridge";
 import { buildRerunArgs, followupChipsFor, type FollowupChip } from "../lib/followupChips";
 import { offerForPlaces, type SavedPlaceRef } from "../lib/offers";
-import { DRAWER_PEEK, FOCUS_CHROME_MIN, MOBILE_MAX_WIDTH } from "../lib/drawer";
+import { DRAWER_PEEK, FOCUS_CHROME_MIN, MOBILE_MAX_WIDTH, snapHeightPx } from "../lib/drawer";
 import { geocodingProvider } from "../lib/geocoding";
 import { placeIdentity, type PlaceIdentity } from "../lib/placeIdentity";
 import { decodeView, encodeView } from "../lib/savedView";
@@ -88,7 +88,7 @@ export function MapWorkspace() {
   const data = useDashboardData();
   const { selectedIds, setSelectedIds, restored } = usePersistedSelection(data.places);
   const [pendingAutoRun, setPendingAutoRun] = useState(false);
-  const { drawer, setCollapsed: setDrawerCollapsed, onResize: onDrawerResize, onToggleCollapsed, onPreset } = useDrawer();
+  const { drawer, setCollapsed: setDrawerCollapsed, onResize: onDrawerResize, onToggleCollapsed, onPreset, onSnap } = useDrawer();
   // Which thread card is expanded (by object identity — the thread cap shifts indices but
   // card references survive), plus the drawer width to restore when it collapses (null
   // means the drawer was collapsed/peeked when we widened, so there's nothing to restore).
@@ -278,7 +278,8 @@ export function MapWorkspace() {
       // The proactive moment must be SEEN when it fires: land on the rail, and raise a
       // collapsed drawer/sheet so the offer is on screen (mobile sheet included).
       setRailView("tabby");
-      setDrawerCollapsed(false);
+      if (isMobile) onSnap("half");
+      else setDrawerCollapsed(false);
     } else {
       setRailView("compare");
     }
@@ -288,7 +289,11 @@ export function MapWorkspace() {
     selectPlaceIds,
     refreshWithFallback: data.refreshWithFallback,
     setActiveTab: (tab) => setRailView(tab),
-    setDrawerCollapsed,
+    // usePinDraft stays boolean-only; translate to a snap on mobile (armed → bar, placed → half).
+    setDrawerCollapsed: (collapsed) => {
+      if (isMobile) onSnap(collapsed ? "bar" : "half");
+      else setDrawerCollapsed(collapsed);
+    },
   });
 
   // A newer search/preview target supersedes the last chip fly; chip clicks leave
@@ -408,7 +413,7 @@ export function MapWorkspace() {
         .map((p) => ({ lat: p.latitude as number, lng: p.longitude as number }));
       if (points.length > 0) {
         const rightInset = isMobile ? 40 : (drawer.collapsed ? DRAWER_PEEK : drawer.widthPx) + 40;
-        const bottomInset = isMobile ? Math.round(window.innerHeight * 0.5) : 40;
+        const bottomInset = isMobile ? snapHeightPx(drawer.snap === "bar" ? "bar" : "half", window.innerHeight) : 40;
         setFitTo({ points, padding: { top: 90, left: 40, right: rightInset, bottom: bottomInset } });
       }
       thread.append({ kind: "analysis_card", card });
@@ -423,7 +428,10 @@ export function MapWorkspace() {
       const item = thread.items[i];
       if (item.kind === "analysis_card" && item.card.placeIds.includes(placeId)) {
         setRailView("tabby");
-        if (drawer.collapsed) setDrawerCollapsed(false);
+        if (drawer.collapsed) {
+          if (isMobile) onSnap("half");
+          else setDrawerCollapsed(false);
+        }
         setFocusCard({ card: item.card });
         return;
       }
@@ -537,14 +545,15 @@ export function MapWorkspace() {
         if (prevWidthRef.current === null) prevWidthRef.current = drawer.collapsed ? null : drawer.widthPx;
         setExpandedCard(card);
         if (!isMobile) onPreset("wide");
-        else setDrawerCollapsed(false);
+        else onSnap("full");
       } else {
         setExpandedCard(null);
         if (!isMobile && prevWidthRef.current !== null) onDrawerResize(prevWidthRef.current);
+        else if (isMobile) onSnap("half");
         prevWidthRef.current = null;
       }
     },
-    [drawer.collapsed, drawer.widthPx, isMobile, onPreset, setDrawerCollapsed, onDrawerResize],
+    [drawer.collapsed, drawer.widthPx, isMobile, onPreset, onSnap, onDrawerResize],
   );
 
   // The run-scoped export param is appended per-card; strip any query the summary path carries.
@@ -679,6 +688,8 @@ export function MapWorkspace() {
           onResize={onDrawerResize}
           onPreset={onPreset}
           isMobile={isMobile}
+          snap={drawer.snap}
+          onSnap={onSnap}
           peekHeader={isMobile ? layerControls : undefined}
           nav={<RailNav view={railView} compareCount={list.entries.length} onSelect={setRailView} />}
         >

@@ -1,10 +1,12 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 
 import { clampWidth, DRAWER_DEFAULT, DRAWER_MIN, DRAWER_PEEK, DRAWER_RESIZE_STEP, DRAWER_WIDE, drawerMax, type DrawerPreset } from "../lib/drawer";
+import type { SheetSnap } from "../types";
 
 const GRABBER_TAP_SLOP = 6;
-const GRABBER_DRAG_THRESHOLD = 40;
+// Fast flick past which the release biases one snap in the drag direction.
+const GRABBER_FLICK = 0.5; // px/ms
 
 type Props = {
   collapsed: boolean;
@@ -15,6 +17,10 @@ type Props = {
   nav?: ReactNode;
   isMobile?: boolean;
   peekHeader?: ReactNode;
+  /** Mobile-only: current sheet snap; defaults to bar/half from `collapsed` until wired. */
+  snap?: SheetSnap;
+  /** Mobile-only: commit a snap after a grabber drag. No-op on desktop. */
+  onSnap?: (snap: SheetSnap) => void;
   children: ReactNode;
 };
 
@@ -41,32 +47,88 @@ export function BottomSheet({
   nav,
   isMobile = false,
   peekHeader,
+  snap,
+  onSnap,
   children,
 }: Props) {
   const panelRef = useRef<HTMLElement>(null);
   const dragging = useRef(false);
   const moved = useRef(false);
-  const grabStartY = useRef<number | null>(null);
+  const dragState = useRef<{ startY: number; startT: number; startHeight: number } | null>(null);
+
+  const effectiveSnap: SheetSnap = snap ?? (collapsed ? "bar" : "half");
 
   function onGrabberPointerDown(event: PointerEvent<HTMLDivElement>) {
-    grabStartY.current = event.clientY;
+    const panel = panelRef.current;
+    if (!panel) return;
+    dragState.current = { startY: event.clientY, startT: performance.now(), startHeight: panel.getBoundingClientRect().height };
     event.currentTarget.setPointerCapture?.(event.pointerId);
   }
 
-  function onGrabberPointerUp(event: PointerEvent<HTMLDivElement>) {
-    const start = grabStartY.current;
-    grabStartY.current = null;
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-    if (start === null) return;
-    const dy = event.clientY - start;
-    if (Math.abs(dy) <= GRABBER_TAP_SLOP) {
-      onToggleCollapsed();
-    } else if (collapsed && dy <= -GRABBER_DRAG_THRESHOLD) {
-      onToggleCollapsed(); // drag up to expand
-    } else if (!collapsed && dy >= GRABBER_DRAG_THRESHOLD) {
-      onToggleCollapsed(); // drag down to collapse
-    }
+  function onGrabberPointerMove(event: PointerEvent<HTMLDivElement>) {
+    const drag = dragState.current;
+    const panel = panelRef.current;
+    if (!drag || !panel) return;
+    const dy = event.clientY - drag.startY;
+    if (Math.abs(dy) <= GRABBER_TAP_SLOP) return;
+    const height = Math.max(80, Math.min(window.innerHeight * 0.95, drag.startHeight - dy));
+    panel.style.height = `${height}px`; // live drag, uncommitted
   }
+
+  function onGrabberPointerUp(event: PointerEvent<HTMLDivElement>) {
+    const drag = dragState.current;
+    const panel = panelRef.current;
+    dragState.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (!drag || !panel) return;
+    panel.style.height = ""; // hand height back to the snap class
+    const dy = event.clientY - drag.startY;
+    if (Math.abs(dy) <= GRABBER_TAP_SLOP) {
+      onToggleCollapsed(); // tap: bar ↔ last expanded (useDrawer owns the memory)
+      return;
+    }
+    const dt = Math.max(1, performance.now() - drag.startT);
+    const velocity = dy / dt; // px/ms; positive = downward
+    const endHeight = drag.startHeight - dy;
+    const vh = window.innerHeight;
+    const candidates: { snap: SheetSnap; h: number }[] = [
+      { snap: "bar", h: 120 },
+      { snap: "half", h: vh * 0.5 },
+      { snap: "full", h: vh * 0.92 },
+    ];
+    let nearest = candidates.reduce((a, b) => (Math.abs(b.h - endHeight) < Math.abs(a.h - endHeight) ? b : a));
+    const index = candidates.findIndex((c) => c.snap === nearest.snap);
+    if (velocity > GRABBER_FLICK) {
+      nearest = candidates[Math.max(0, index - 1)]; // fast downward flick: one snap lower
+    } else if (velocity < -GRABBER_FLICK) {
+      nearest = candidates[Math.min(candidates.length - 1, index + 1)]; // fast upward flick: one snap higher
+    }
+    onSnap?.(nearest.snap);
+  }
+
+  function onGrabberPointerCancel(event: PointerEvent<HTMLDivElement>) {
+    dragState.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (panelRef.current) panelRef.current.style.height = "";
+  }
+
+  useEffect(() => {
+    if (!isMobile || typeof window === "undefined" || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const panel = panelRef.current;
+    const update = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      panel?.style.setProperty("--kb-inset", `${inset}px`);
+    };
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    update();
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      panel?.style.removeProperty("--kb-inset");
+    };
+  }, [isMobile]);
 
   function presetPressed(preset: DrawerPreset) {
     if (preset === "peek") return collapsed;
@@ -138,7 +200,7 @@ export function BottomSheet({
   return (
     <section
       ref={panelRef}
-      className={`mc-workspace-panel ${collapsed ? "is-collapsed" : "is-open"}`}
+      className={`mc-workspace-panel ${collapsed ? "is-collapsed" : "is-open"}${isMobile ? ` is-${effectiveSnap}` : ""}`}
       style={!isMobile && !collapsed ? { width: widthPx } : undefined}
       aria-label="Workspace panel"
     >
@@ -151,8 +213,9 @@ export function BottomSheet({
             aria-label={collapsed ? "Expand panel" : "Collapse panel"}
             aria-expanded={!collapsed}
             onPointerDown={onGrabberPointerDown}
+            onPointerMove={onGrabberPointerMove}
             onPointerUp={onGrabberPointerUp}
-            onPointerCancel={() => { grabStartY.current = null; }}
+            onPointerCancel={onGrabberPointerCancel}
             onKeyDown={(event) => activateWithKeyboard(event, onToggleCollapsed)}
           >
             <b />

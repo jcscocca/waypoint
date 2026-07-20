@@ -1,3 +1,5 @@
+import type { SheetSnap } from "../types";
+
 export const DRAWER_MIN = 340;
 export const DRAWER_DEFAULT = 400;
 export const DRAWER_WIDE = 640;
@@ -14,6 +16,15 @@ export const FOCUS_CHROME_MIN = 240;
 export const MOBILE_MAX_WIDTH = 760;
 
 export type DrawerPreset = "peek" | "default" | "wide" | "focus";
+
+export const SHEET_SNAPS = ["bar", "half", "full"] as const;
+
+/** Fraction of the viewport height each snap occupies (bar is content-height CSS). */
+export function snapHeightPx(snap: SheetSnap, viewportH: number): number {
+  if (snap === "full") return Math.round(viewportH * 0.92);
+  if (snap === "half") return Math.round(viewportH * 0.5);
+  return 120; // bar: approx grabber + peek header; used for map padding only
+}
 
 export function drawerMax(): number {
   const vw = typeof window === "undefined" ? 1280 : window.innerWidth;

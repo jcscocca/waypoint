@@ -105,7 +105,7 @@
 @keyframes tabby-pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.18);}}
 .mc-tabby-pulse{animation:tabby-pulse 1.6s ease-in-out 2;transform-origin:center;}
 .mc-dock-collapse{display:grid;place-items:center;width:26px;height:26px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;}
-.mc-dock-log{display:grid;gap:7px;max-height:200px;overflow:auto;}
+.mc-dock-log{display:grid;gap:7px;max-height:200px;overflow:auto;overscroll-behavior:contain;}
 .mc-dock-msg{margin:0;padding:8px 10px;border-radius:10px;font-size:12.5px;line-height:1.45;overflow-wrap:anywhere;}
 .mc-dock-msg.is-user{margin-left:34px;color:var(--on-accent);background:var(--accent);}
 .mc-dock-msg.is-assistant{margin-right:22px;color:var(--text-strong);background:var(--surface-sunken);border:1px solid var(--border);}
@@ -482,15 +482,20 @@ input.mc-inp:focus{outline:2px solid var(--accent);outline-offset:1px;}
   /* Workspace panel becomes a bottom sheet: full width, height-driven, flex column. */
   .mc-workspace-panel{
     top:auto;left:0;right:0;bottom:0;
-    width:100%;height:min(80dvh,620px);
+    width:100%;height:min(50dvh,620px);
     display:flex;flex-direction:column;
     border-left:0;border-top:1px solid var(--border);
     border-radius:16px 16px 0 0;
     background:var(--surface);
     box-shadow:0 -18px 40px -26px rgba(16,24,32,.4);
-    padding-bottom:env(safe-area-inset-bottom);
+    padding-bottom:calc(env(safe-area-inset-bottom) + var(--kb-inset,0px));
+    transition:height .22s cubic-bezier(.2,.8,.2,1);
     animation:sheetin .4s cubic-bezier(.2,.8,.2,1) both;
   }
+  /* Three snap heights (Slice 6). half is the base open height; is-bar co-applies with the
+     legacy is-collapsed peek class for this slice (both collapse to content height). */
+  .mc-workspace-panel.is-full{height:min(92dvh,100%);}
+  .mc-workspace-panel.is-bar{height:auto;transition:none;}
   .mc-workspace-panel.is-collapsed{width:100%;height:auto;} /* Peek: grabber + head + tabs only */
 
   .mc-grabber{display:flex;align-items:center;justify-content:center;height:26px;flex:none;cursor:grab;touch-action:none;}
@@ -507,7 +512,7 @@ input.mc-inp:focus{outline:2px solid var(--accent);outline-offset:1px;}
 
   .mc-railnav{padding:0 14px 8px;}
 
-  .mc-panels{flex:1;min-height:0;overflow:auto;}
+  .mc-panels{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;}
   .mc-workspace-panel.is-collapsed .mc-panels,
   .mc-workspace-panel.is-collapsed .mc-dock-slot{display:none;}
   .mc-workspace-panel.is-collapsed .mc-tabs{border-bottom:0;}

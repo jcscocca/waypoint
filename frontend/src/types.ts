@@ -142,7 +142,9 @@ export type PlaceCreate = {
 
 export type TabKey = "compare" | "export";
 
-export type DrawerState = { collapsed: boolean; widthPx: number };
+export type SheetSnap = "bar" | "half" | "full";
+
+export type DrawerState = { collapsed: boolean; widthPx: number; snap: SheetSnap };
 
 export type LatLng = { lat: number; lng: number };
 
