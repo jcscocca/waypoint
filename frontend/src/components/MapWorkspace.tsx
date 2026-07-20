@@ -5,6 +5,7 @@ import { currentYearAnalysisWindow } from "../lib/analysisDefaults";
 import { compactGeocodeLabel } from "../lib/addressLabel";
 import { describeAnalysisPatch } from "../lib/analysisReceipt";
 import { interpretToolResult } from "../lib/assistantBridge";
+import { buildRerunArgs, followupChipsFor, type FollowupChip } from "../lib/followupChips";
 import { DRAWER_PEEK, FOCUS_CHROME_MIN, MOBILE_MAX_WIDTH } from "../lib/drawer";
 import { geocodingProvider } from "../lib/geocoding";
 import { placeIdentity, type PlaceIdentity } from "../lib/placeIdentity";
@@ -37,7 +38,7 @@ import { ManagePlacesModal, type ManageView } from "./ManagePlacesModal";
 import { RailNav, type RailView } from "./RailNav";
 import { SearchPill } from "./SearchPill";
 import { ThemeToggle } from "./ThemeToggle";
-import type { AnalysisSettings, AssistantDashboardState, BeatFeatureCollection, GeocodeResult, LatLng, MapBounds, McppFeatureCollection, PlaceCreate } from "../types";
+import type { AnalysisCardData, AnalysisSettings, AssistantDashboardState, BeatFeatureCollection, GeocodeResult, LatLng, MapBounds, McppFeatureCollection, PlaceCreate } from "../types";
 
 export function MapWorkspace() {
   const { theme, setTheme } = useTheme();
@@ -84,6 +85,11 @@ export function MapWorkspace() {
   const { selectedIds, setSelectedIds, restored } = usePersistedSelection(data.places);
   const [pendingAutoRun, setPendingAutoRun] = useState(false);
   const { drawer, setCollapsed: setDrawerCollapsed, onResize: onDrawerResize, onToggleCollapsed, onPreset } = useDrawer();
+  // Which thread card is expanded (by object identity — the thread cap shifts indices but
+  // card references survive), plus the drawer width to restore when it collapses (null
+  // means the drawer was collapsed/peeked when we widened, so there's nothing to restore).
+  const [expandedCard, setExpandedCard] = useState<AnalysisCardData | null>(null);
+  const prevWidthRef = useRef<number | null>(null);
 
   // The single address list: seeded from the restored saved selection (share links replace
   // it on mount below). Saved ids write back through so returning sessions keep their list.
@@ -345,7 +351,8 @@ export function MapWorkspace() {
     if (effect.refetchSummary) {
       void data.refreshWithFallback("Analyst updated the view, but dashboard totals could not refresh.");
     }
-    if (effect.tab) setRailView(effect.tab);
+    // The frozen card lands in the thread alongside the map effects — it doesn't replace them.
+    if (effect.card) thread.append({ kind: "analysis_card", card: effect.card });
   }
 
   const buildShareUrl = useCallback((): string | null => {
@@ -408,6 +415,45 @@ export function MapWorkspace() {
   const isMobile = window.innerWidth <= MOBILE_MAX_WIDTH;
   // Focus mode is a desktop side-panel concept — force it off on mobile (the bottom sheet).
   const isFocus = !isMobile && !drawer.collapsed && window.innerWidth - drawer.widthPx < FOCUS_CHROME_MIN;
+
+  // Follow-up chips key off the newest card's OWN frozen scope, so they re-run against what
+  // the card shows even after the live dashboard has moved on.
+  const latestCard: AnalysisCardData | null = useMemo(() => {
+    for (let i = thread.items.length - 1; i >= 0; i--) {
+      const item = thread.items[i];
+      if (item.kind === "analysis_card") return item.card;
+    }
+    return null;
+  }, [thread.items]);
+  const followupChips = useMemo(
+    () => (latestCard ? followupChipsFor(latestCard.kind, latestCard.settings, data.availableRadii) : []),
+    [latestCard, data.availableRadii],
+  );
+  function handleFollowupChip(chip: FollowupChip) {
+    if (!latestCard) return;
+    void turn.runCommand(chip.label, chip.command, buildRerunArgs(latestCard, chip));
+  }
+
+  // Expanding a card widens the drawer to read the expanded view; collapsing restores the
+  // prior width. useCallback so cards can be memoized later without churning this prop.
+  const handleCardExpandChange = useCallback(
+    (card: AnalysisCardData, expanded: boolean) => {
+      if (expanded) {
+        if (prevWidthRef.current === null) prevWidthRef.current = drawer.collapsed ? null : drawer.widthPx;
+        setExpandedCard(card);
+        if (!isMobile) onPreset("wide");
+        else setDrawerCollapsed(false);
+      } else {
+        setExpandedCard(null);
+        if (!isMobile && prevWidthRef.current !== null) onDrawerResize(prevWidthRef.current);
+        prevWidthRef.current = null;
+      }
+    },
+    [drawer.collapsed, drawer.widthPx, isMobile, onPreset, setDrawerCollapsed, onDrawerResize],
+  );
+
+  // The run-scoped export param is appended per-card; strip any query the summary path carries.
+  const exportHrefBase = data.exportHref.split("?")[0];
 
   // Below the breakpoint the panel is a bottom sheet and the layer controls live inside it.
   const layerControls = (
@@ -551,6 +597,11 @@ export function MapWorkspace() {
                 onSend={(text) => void turn.sendChat(text)}
                 onRetry={() => void turn.sendChat(null)}
                 onRunCommand={runPanelCommand}
+                followupChips={followupChips}
+                onFollowupChip={handleFollowupChip}
+                expandedCard={expandedCard}
+                onCardExpandChange={handleCardExpandChange}
+                exportHrefBase={exportHrefBase}
                 contextStrip={
                   <ContextStrip analysis={analysis} availableRadii={data.availableRadii} onChange={handleAnalysisChange} />
                 }

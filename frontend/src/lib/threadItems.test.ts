@@ -32,4 +32,27 @@ describe("toApiMessages", () => {
   it("returns an empty array for an empty thread", () => {
     expect(toApiMessages([])).toEqual([]);
   });
+
+  it("skips analysis_card items", () => {
+    const items: ThreadItem[] = [
+      { kind: "user_text", text: "analyze Alpha" },
+      {
+        kind: "analysis_card",
+        card: {
+          runId: "run-1",
+          kind: "analyze",
+          placeIds: ["a"],
+          settings: {},
+          comparison: null,
+          neighborhood: null,
+          incidents: null,
+        },
+      },
+      { kind: "tabby_text", text: "Here's Alpha." },
+    ];
+    expect(toApiMessages(items)).toEqual([
+      { role: "user", content: "analyze Alpha" },
+      { role: "assistant", content: "Here's Alpha." },
+    ]);
+  });
 });

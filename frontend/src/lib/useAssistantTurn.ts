@@ -28,25 +28,44 @@ export function useAssistantTurn({ dashboardState, items, append, onToolResult }
   const [statusLine, setStatusLine] = useState("");
   const [toolActivity, setToolActivity] = useState<{ label: string }[]>([]);
   const [offline, setOffline] = useState(false);
-  // Synchronous re-entrancy gate: state updates lag within a tick.
-  const inFlight = useRef(false);
+  // Newest intent wins: a new turn aborts the one in flight. `turnSeq` tags each turn so a
+  // superseded turn writes nothing (every state mutation is gated by `live()`) and its
+  // `finally` can't clear the busy/draft state owned by the turn that replaced it.
+  const turnSeq = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const runTurn = useCallback(
-    async (kind: "chat" | "command", start: (onEvent: (event: AssistantStreamEvent) => void) => Promise<void>) => {
-      if (inFlight.current) return;
-      inFlight.current = true;
+    async (
+      kind: "chat" | "command",
+      start: (onEvent: (event: AssistantStreamEvent) => void, signal: AbortSignal) => Promise<void>,
+    ) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const myTurn = ++turnSeq.current;
+      const live = () => turnSeq.current === myTurn;
       let text = "";
       let errored = false;
       let errMessage = "";
       let errCode = "";
+      // A settings-only command turn (only update_filters ran) already has a receipt for
+      // its effect; suppress the duplicate summary bubble. Any other tool keeps the summary.
+      // (The command route emits at most one tool event per turn today — the &&= accumulation
+      // is defensive for a future multi-tool route.)
+      let sawTool = false;
+      let settingsOnly = true;
       setDraft("");
       setStatusLine("");
       setToolActivity([]);
       setBusy(true);
       try {
         await start((event) => {
+          // A superseded turn's late events apply nothing.
+          if (!live()) return;
           if (event.event === "tool") {
             const toolName = String(event.data.tool_name ?? "tool");
+            sawTool = true;
+            settingsOnly &&= toolName === "update_filters";
             setToolActivity((current) => [{ label: toolName }, ...current].slice(0, 4));
             onToolResult?.(event.data);
           }
@@ -70,8 +89,9 @@ export function useAssistantTurn({ dashboardState, items, append, onToolResult }
             }
             errored = true;
           }
-        });
-        if (!errored && text.trim()) {
+        }, controller.signal);
+        if (!live()) return;
+        if (!errored && text.trim() && !(kind === "command" && sawTool && settingsOnly)) {
           append({ kind: "tabby_text", text: text.trim() });
         }
         if (errored) {
@@ -80,14 +100,21 @@ export function useAssistantTurn({ dashboardState, items, append, onToolResult }
         } else if (kind === "chat") {
           setOffline(false);
         }
-      } catch {
+      } catch (error) {
+        // A turn superseded mid-stream was aborted: it appends no notice and never
+        // touches `offline`. Abort rejections vary by runtime, so check both the error
+        // name and the controller's own aborted flag.
+        if ((error as Error)?.name === "AbortError" || controller.signal.aborted || !live()) return;
         append({ kind: "notice", text: OFFLINE_MESSAGE });
         if (kind === "chat") setOffline(true);
       } finally {
-        setDraft("");
-        setStatusLine("");
-        setBusy(false);
-        inFlight.current = false;
+        // Only the live turn clears shared busy/draft — a superseded turn must not wipe
+        // the state owned by the turn that replaced it.
+        if (live()) {
+          setDraft("");
+          setStatusLine("");
+          setBusy(false);
+        }
       }
     },
     [append, onToolResult],
@@ -96,16 +123,13 @@ export function useAssistantTurn({ dashboardState, items, append, onToolResult }
   // text === null re-sends the thread as-is (Retry after an error notice).
   const sendChat = useCallback(
     (text: string | null) => {
-      // Guard before the user_text append so an ignored call leaves no orphan
-      // bubble; runTurn's own check stays as the backstop.
-      if (inFlight.current) return Promise.resolve();
       const apiMessages = toApiMessages(items);
       if (text !== null) {
         apiMessages.push({ role: "user", content: text });
         append({ kind: "user_text", text });
       }
-      return runTurn("chat", (onEvent) =>
-        streamAssistantChat({ messages: apiMessages, dashboard_state: dashboardState }, { onEvent }),
+      return runTurn("chat", (onEvent, signal) =>
+        streamAssistantChat({ messages: apiMessages, dashboard_state: dashboardState }, { onEvent }, signal),
       );
     },
     [items, append, dashboardState, runTurn],
@@ -113,10 +137,9 @@ export function useAssistantTurn({ dashboardState, items, append, onToolResult }
 
   const runCommand = useCallback(
     (label: string, command: AssistantCommandName, args: Record<string, unknown> = {}) => {
-      if (inFlight.current) return Promise.resolve();
       append({ kind: "user_text", text: label });
-      return runTurn("command", (onEvent) =>
-        streamAssistantCommand({ command, arguments: args }, { onEvent }),
+      return runTurn("command", (onEvent, signal) =>
+        streamAssistantCommand({ command, arguments: args }, { onEvent }, signal),
       );
     },
     [append, runTurn],

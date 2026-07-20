@@ -205,12 +205,14 @@ async function streamAssistantSse(
   path: string,
   payload: unknown,
   handlers: AssistantHandlers,
+  signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch(path, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal,
   });
   if (!response.ok) {
     const text = await response.text();
@@ -240,8 +242,9 @@ export function streamAssistantChat(
     dashboard_state: AssistantDashboardState;
   },
   handlers: AssistantHandlers,
+  signal?: AbortSignal,
 ): Promise<void> {
-  return streamAssistantSse("/assistant/chat", payload, handlers);
+  return streamAssistantSse("/assistant/chat", payload, handlers, signal);
 }
 
 export type AssistantCommandName =
@@ -255,8 +258,9 @@ export type AssistantCommandName =
 export function streamAssistantCommand(
   payload: { command: AssistantCommandName; arguments?: Record<string, unknown> },
   handlers: AssistantHandlers,
+  signal?: AbortSignal,
 ): Promise<void> {
-  return streamAssistantSse("/assistant/commands", payload, handlers);
+  return streamAssistantSse("/assistant/commands", payload, handlers, signal);
 }
 
 function flushAssistantEvents(

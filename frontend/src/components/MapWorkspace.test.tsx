@@ -517,7 +517,7 @@ describe("MapWorkspace", () => {
     expect(await screen.findByText(/unable to start a dashboard session/i)).toBeInTheDocument();
   });
 
-  it("opens the Compare tab with the overview when the assistant returns compare_places", async () => {
+  it("stays on the rail when the assistant returns compare_places (no view switch)", async () => {
     const a: Place = { ...home, id: "a", display_label: "Alpha" };
     const b: Place = { ...work, id: "b", display_label: "Bravo" };
     vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
@@ -552,12 +552,14 @@ describe("MapWorkspace", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    // Only resolves if the bridge replaced the selection (so CompareTab has 2 places),
-    // set the comparison, and switched to the Compare tab.
-    expect(await screen.findByTestId("compare-ranked")).toBeInTheDocument();
+    // The turn completes and the bridge applies its effect without bouncing to the
+    // Compare view — the composer stays put. (Card-content assertions land in Task 6.)
+    await screen.findByText("Compared Alpha and Bravo.");
+    expect(screen.getByLabelText("Analyst message")).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: "Compare" })).not.toBeInTheDocument();
   });
 
-  it("renders assistant analyze_places incidents on the Compare surface", async () => {
+  it("stays on the rail when the assistant returns analyze_places (no view switch)", async () => {
     const a: Place = { ...home, id: "a", display_label: "Alpha" };
     vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
     vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([a]));
@@ -582,8 +584,12 @@ describe("MapWorkspace", () => {
     await backToTabby();
     fireEvent.change(screen.getByLabelText("Analyst message"), { target: { value: "analyze Alpha" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    expect(await screen.findByText("100 block of Main St")).toBeInTheDocument();
-    // analyze_places lands on the Compare surface without firing a cross-address comparison.
+    // The turn completes without bouncing to the Compare view — the composer stays put.
+    // (Card-content assertions land in Task 6.)
+    await screen.findByText("Analyzed Alpha.");
+    expect(screen.getByLabelText("Analyst message")).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: "Compare" })).not.toBeInTheDocument();
+    // analyze_places doesn't fire a cross-address comparison.
     expect(comparePlaces).not.toHaveBeenCalled();
   });
 
@@ -934,7 +940,7 @@ describe("MapWorkspace", () => {
     expect(comparePlaces).not.toHaveBeenCalled();
   });
 
-  it("applies an assistant analyze_places context module onto the Compare surface", async () => {
+  it("applies an assistant analyze_places effect without leaving the rail", async () => {
     const a: Place = { ...home, id: "a", display_label: "Alpha" };
     vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
     vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([a]));
@@ -967,10 +973,17 @@ describe("MapWorkspace", () => {
     render(<MapWorkspace />);
     await screen.findByRole("checkbox", { name: "Alpha" });
     await backToTabby();
+    // The restored-selection auto-run fires its own summary refresh (call #2) — let it
+    // settle first so the wait below is unambiguously the tool effect's own refetch.
+    await waitFor(() => expect(getDashboardSummary).toHaveBeenCalledTimes(2));
     fireEvent.change(screen.getByLabelText("Analyst message"), { target: { value: "analyze Alpha" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    const comparePanel = await screen.findByRole("tabpanel", { name: "Compare" });
-    expect(await within(comparePanel).findByLabelText("Context for Alpha")).toBeInTheDocument();
+    // The tool effect's refetchSummary is the only observable completion signal here (this
+    // mock emits no token event) — it fires once the bridge applies the effect.
+    await waitFor(() => expect(getDashboardSummary).toHaveBeenCalledTimes(3));
+    // No view switch: the composer stays on the rail. (Card-content assertions land in Task 6.)
+    expect(screen.getByLabelText("Analyst message")).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: "Compare" })).not.toBeInTheDocument();
     expect(comparePlaces).not.toHaveBeenCalled();
   });
 
@@ -1232,11 +1245,13 @@ describe("MapWorkspace", () => {
     expect(await within(rows).findByText("Pin 9")).toBeInTheDocument();
   });
 
-  it("keeps an assistant-applied comparison when its refetch resolves a queued place id", async () => {
+  it("resolves a queued place id from an assistant compare_places refetch without leaving the rail", async () => {
     // compare-by-name: the backend creates the unsaved place and returns its id, so the
     // bridge's replace queues an id that data.places can't resolve yet. The tool effect's
-    // own summary refetch delivers it — and that resolve-append must NOT drop the applied
-    // pane (runPoints === null: assistant results aren't keyed to this list).
+    // own summary refetch delivers it. (This used to also assert the applied comparison
+    // pane survived the resolve-append; that's only observable via the Compare tab, which
+    // assistant flows no longer switch to — pane-survival coverage returns with the
+    // AnalysisCard render in Task 6.)
     const pike: Place = { ...home, id: "p9", display_label: "Pike Street", latitude: 47.63, longitude: -122.35 };
     vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
     vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([home, work]));
@@ -1272,14 +1287,17 @@ describe("MapWorkspace", () => {
     fireEvent.change(screen.getByLabelText("Analyst message"), { target: { value: "compare with Pike Street" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    // The applied pane renders while p9 is still pending resolution.
-    expect(await screen.findByTestId("compare-ranked")).toBeInTheDocument();
+    // The tool effect fires its own refetch (call #3) while p9 is still pending resolution;
+    // the flow stays on the rail throughout (no view switch).
+    await waitFor(() => expect(getDashboardSummary).toHaveBeenCalledTimes(3));
+    expect(screen.getByLabelText("Analyst message")).toBeInTheDocument();
 
-    // The refetch lands WITH p9's place: the row appends and the pane survives.
+    // The refetch lands WITH p9's place: the row appends to the underlying list (the
+    // address list itself only renders inside the Compare panel, so open it to inspect).
     resolveSummary(makeSummary([home, work, pike]));
+    openLegacyView("Compare");
     const rows = screen.getByRole("list", { name: /addresses to compare/i });
     expect(await within(rows).findByText("Pike Street")).toBeInTheDocument();
-    expect(screen.getByTestId("compare-ranked")).toBeInTheDocument();
   });
 
   it("runs the compare chip as a structured command and applies its effect on the rail", async () => {
@@ -1347,11 +1365,121 @@ describe("MapWorkspace", () => {
     expect(await screen.findByText("Couldn't reach the analyst.")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText("Analyst message")).toBeDisabled());
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
-    expect(screen.getByText(/your filters and retry still work/i)).toBeInTheDocument();
+    expect(screen.getByText(/chips and filters still work/i)).toBeInTheDocument();
 
     // Filters are not gated by offline: a radius change still records a receipt on the rail.
     fireEvent.click(screen.getByRole("button", { name: /analysis context/i }));
     fireEvent.click(screen.getByRole("button", { name: "500 m" }));
     expect(await screen.findByText("Search radius → 500 m")).toBeInTheDocument();
+  });
+
+  // --- Slice 3 Task 6: cards in the thread + follow-up chips + width toggle + export base ---
+
+  // The frozen result the assistant analyze flow emits, with a window that DIFFERS from the
+  // live current-year default so the frozen-vs-live distinction is observable.
+  function analyzeCardResult(extra: Record<string, unknown> = {}) {
+    return {
+      place_ids: ["a"],
+      settings_used: {
+        radius_m: 250,
+        analysis_start_date: "2026-01-01",
+        analysis_end_date: "2026-06-30",
+        offense_category: null,
+        layer: "reported",
+      },
+      neighborhood: makeNeighborhoodAnalysis(),
+      incidents: makeIncidentDetails(),
+      ...extra,
+    };
+  }
+
+  function mockAnalyzeChat(result: Record<string, unknown>) {
+    vi.mocked(streamAssistantChat).mockImplementation(async (_payload, handlers) => {
+      handlers.onEvent({ event: "tool", data: { tool_name: "analyze_places", result } });
+      handlers.onEvent({ event: "token", data: { delta: "Analyzed Alpha." } });
+      handlers.onEvent({ event: "done", data: {} });
+    });
+  }
+
+  // Shared setup for the card tests: a single saved place, the auto-run's compare mocks, and
+  // the analyze chat mock. Returns after the composer is reachable again on the rail.
+  async function renderWithAnalyzeCard(result: Record<string, unknown>) {
+    const a: Place = { ...home, id: "a", display_label: "Alpha" };
+    vi.mocked(createSession).mockResolvedValue({ session_state: "ready" });
+    vi.mocked(getDashboardSummary).mockResolvedValue(makeSummary([a]));
+    vi.mocked(analyzePlaces).mockResolvedValue({ summary_count: 1 });
+    vi.mocked(getNeighborhoodAnalysis).mockResolvedValue(makeNeighborhoodAnalysis());
+    vi.mocked(getIncidentDetails).mockResolvedValue(makeIncidentDetails());
+    mockAnalyzeChat(result);
+    const view = render(<MapWorkspace />);
+    await screen.findByText("Alpha");
+    await backToTabby();
+    fireEvent.change(screen.getByLabelText("Analyst message"), { target: { value: "analyze Alpha" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Analyzed Alpha.");
+    return view;
+  }
+
+  it("appends an analysis card to the rail thread with its frozen settings and place line", async () => {
+    const neighborhood: NeighborhoodAnalysis = {
+      ...makeNeighborhoodAnalysis(),
+      places: [{
+        place_id: "n-a", place_label: "Alpha", beat: "M2", radius_m: 250,
+        baseline_available: false, decision: "baseline_unavailable", place_incident_count: 3,
+        place_rate: 0.5, place_rate_ci_lower: 0.3, place_rate_ci_upper: 0.8,
+        minimum_data_status: "met", nearest_incident_m: 40, monthly_counts: [],
+        category_breakdown: [], baselines: [],
+      }],
+    };
+    const { container } = await renderWithAnalyzeCard(analyzeCardResult({ neighborhood }));
+
+    const settings = container.querySelector(".mc-card-settings");
+    expect(settings?.textContent).toMatch(/250 m/);
+    expect(container.querySelector(".mc-card-verdict")?.textContent).toMatch(/Alpha/);
+    // No view switch — the card lives in the thread and the composer stays on the rail.
+    expect(screen.getByLabelText("Analyst message")).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: "Compare" })).not.toBeInTheDocument();
+  });
+
+  it("re-runs a follow-up chip against the card's FROZEN scope, not the live dashboard", async () => {
+    vi.mocked(streamAssistantCommand).mockImplementation(async (_p, { onEvent }) => {
+      onEvent({ event: "done", data: {} });
+    });
+    await renderWithAnalyzeCard(analyzeCardResult());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Widen to 500 m" }));
+    await waitFor(() => expect(streamAssistantCommand).toHaveBeenCalled());
+    const payload = vi.mocked(streamAssistantCommand).mock.calls[0][0];
+    expect(payload.command).toBe("analyze_places");
+    // radii_m carries the chip's widen patch; the window is the CARD's (2026-06-30), never the
+    // live current-year default (2026-07-19) — proving the re-run reads frozen settings.
+    expect(payload.arguments).toEqual(expect.objectContaining({
+      place_ids: ["a"],
+      radii_m: [500],
+      analysis_start_date: "2026-01-01",
+      analysis_end_date: "2026-06-30",
+      layer: "reported",
+    }));
+    expect(payload.arguments).not.toHaveProperty("radius_m");
+    // The card window (2026-06-30) is not the live current-year default, so the objectContaining
+    // above can only pass by reading the frozen card settings.
+    expect(currentYearAnalysisWindow().analysis_end_date).not.toBe("2026-06-30");
+  });
+
+  it("expanding a card widens the drawer and collapsing restores the prior width", async () => {
+    const { container } = await renderWithAnalyzeCard(analyzeCardResult());
+    const widthNow = () => (container.querySelector(".mc-workspace-panel") as HTMLElement).style.width;
+
+    expect(widthNow()).toBe("400px");
+    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
+    expect(widthNow()).toBe("640px");
+    fireEvent.click(screen.getByRole("button", { name: "Collapse" }));
+    expect(widthNow()).toBe("400px");
+  });
+
+  it("the card export link carries the run-scoped run_id", async () => {
+    await renderWithAnalyzeCard(analyzeCardResult({ analysis_run_id: "run-xyz" }));
+    const link = screen.getByRole("link", { name: "Export CSV" });
+    expect(link.getAttribute("href")).toContain("run_id=run-xyz");
   });
 });

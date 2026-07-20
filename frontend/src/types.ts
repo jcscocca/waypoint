@@ -185,6 +185,29 @@ export type TrendsResponse = {
   citywide_counts: number[];
 };
 
+// Mirrors the backend `_settings_used` echo (app/assistant/tools.py): only the fields the
+// dashboard's AnalysisSettings can apply. offense_subcategory / nibrs_group are honored as
+// filters server-side but intentionally not echoed (no UI control), keeping the contract 1:1.
+export type SettingsUsed = {
+  radius_m?: number;
+  analysis_start_date?: string;
+  analysis_end_date?: string;
+  offense_category?: string | null;
+  layer?: LayerKey;
+};
+
+/** A frozen snapshot of an assistant-driven analyze/compare run, enough to render the
+ * `analysis_card` thread item without touching live dashboard state. */
+export type AnalysisCardData = {
+  runId: string | null;
+  kind: "analyze" | "compare";
+  placeIds: string[];
+  settings: SettingsUsed;
+  comparison: SiteComparison | null;
+  neighborhood: NeighborhoodAnalysis | null;
+  incidents: IncidentDetailsResponse | null;
+};
+
 export type AssistantToolEffect = {
   selection?: { mode: "replace" | "add" | "clear"; ids: string[] };
   settings?: Partial<AnalysisSettings>;
@@ -192,7 +215,7 @@ export type AssistantToolEffect = {
   neighborhood?: NeighborhoodAnalysis | null;
   incidents?: IncidentDetailsResponse | null;
   refetchSummary?: boolean;
-  tab?: TabKey;
+  card?: AnalysisCardData;
 };
 
 export type AssistantMessage = {

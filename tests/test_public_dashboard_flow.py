@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from app.db import get_sessionmaker
 from app.main import create_app
 from app.models import CrimeIncident
+from app.services.analysis_runs import latest_analysis_run_id
+from app.sessions import public_user_hash
 
 
 def test_public_dashboard_flow_without_uploads(tmp_path, monkeypatch):
@@ -124,3 +126,136 @@ def test_public_place_summary_export_excludes_sensitive_places(tmp_path):
     labels = [row["display_label"] for row in csv.DictReader(StringIO(export_response.text))]
     assert "Public stop" in labels
     assert "My home" not in labels
+
+
+def test_export_scopes_to_requested_run(tmp_path):
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+    client.post("/sessions")
+    user_hash = public_user_hash(client.cookies.get("mca_session"))
+    assert user_hash is not None
+
+    session = get_sessionmaker()()
+    session.add(
+        CrimeIncident(
+            id="run-scope-incident",
+            offense_start_utc=datetime(2024, 1, 10, tzinfo=UTC),
+            offense_category="PROPERTY",
+            latitude=47.609,
+            longitude=-122.333,
+        )
+    )
+    session.commit()
+    session.close()
+
+    create_response = client.post(
+        "/places",
+        json={
+            "display_label": "Run-scoped stop",
+            "latitude": 47.609,
+            "longitude": -122.333,
+            "visit_count": 12,
+        },
+    )
+    assert create_response.status_code == 201
+    place_id = create_response.json()["id"]
+
+    # Older run: no category filter, so the PROPERTY incident is counted.
+    older_analyze = client.post(
+        "/dashboard/analyze",
+        json={
+            "place_ids": [place_id],
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "radii_m": [250],
+        },
+    )
+    assert older_analyze.status_code == 200
+    with get_sessionmaker()() as query_session:
+        older_run_id = latest_analysis_run_id(query_session, user_hash)
+    assert older_run_id is not None
+
+    # Newer run: filtered to a category the incident doesn't have, so it drops out.
+    newer_analyze = client.post(
+        "/dashboard/analyze",
+        json={
+            "place_ids": [place_id],
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "radii_m": [250],
+            "offense_category": "PERSON",
+        },
+    )
+    assert newer_analyze.status_code == 200
+    with get_sessionmaker()() as query_session:
+        newer_run_id = latest_analysis_run_id(query_session, user_hash)
+    assert newer_run_id is not None
+    assert newer_run_id != older_run_id
+
+    older_response = client.get(f"/exports/tableau/place-summary.csv?run_id={older_run_id}")
+    assert older_response.status_code == 200
+    assert older_response.headers["content-type"].startswith("text/csv")
+    older_rows = list(csv.DictReader(StringIO(older_response.text)))
+    assert older_rows[0]["incident_count"] == "1"
+
+    newer_response = client.get(f"/exports/tableau/place-summary.csv?run_id={newer_run_id}")
+    assert newer_response.status_code == 200
+    newer_rows = list(csv.DictReader(StringIO(newer_response.text)))
+    # The PERSON-filtered run has no matching incidents, so no PlaceCrimeSummary row was
+    # persisted for it — the export shows the place with a blank incident_count, distinct
+    # from the older run's "1", confirming the export is scoped to the requested run.
+    assert newer_rows[0]["incident_count"] == ""
+
+
+def test_export_rejects_foreign_or_unknown_run(tmp_path):
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    owner = TestClient(app)
+    owner.post("/sessions")
+
+    unknown_response = owner.get("/exports/tableau/place-summary.csv?run_id=not-a-real-run")
+    assert unknown_response.status_code == 404
+
+    stranger = TestClient(app)
+    stranger.post("/sessions")
+    stranger_user_hash = public_user_hash(stranger.cookies.get("mca_session"))
+    assert stranger_user_hash is not None
+
+    place_response = stranger.post(
+        "/places",
+        json={
+            "display_label": "Stranger's stop",
+            "latitude": 47.612,
+            "longitude": -122.335,
+            "visit_count": 4,
+        },
+    )
+    assert place_response.status_code == 201
+    place_id = place_response.json()["id"]
+
+    stranger_analyze = stranger.post(
+        "/dashboard/analyze",
+        json={
+            "place_ids": [place_id],
+            "analysis_start_date": "2024-01-01",
+            "analysis_end_date": "2024-01-31",
+            "radii_m": [250],
+        },
+    )
+    assert stranger_analyze.status_code == 200
+    with get_sessionmaker()() as query_session:
+        stranger_run_id = latest_analysis_run_id(query_session, stranger_user_hash)
+    assert stranger_run_id is not None
+
+    foreign_response = owner.get(f"/exports/tableau/place-summary.csv?run_id={stranger_run_id}")
+    assert foreign_response.status_code == 404
+
+
+def test_export_without_run_id_unchanged(tmp_path):
+    app = create_app(database_url=f"sqlite+pysqlite:///{tmp_path / 'mca.sqlite3'}")
+    client = TestClient(app)
+    client.post("/sessions")
+
+    response = client.get("/exports/tableau/place-summary.csv")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")

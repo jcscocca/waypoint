@@ -22,6 +22,7 @@ from app.config import get_settings
 from app.crime.sources import sources_for_layer
 from app.geocoding.providers import build_provider
 from app.models import PlaceCluster
+from app.services.analysis_runs import latest_analysis_run_id
 from app.services.dashboard_analysis_service import (
     analyze_selected_places,
     compare_selected_places,
@@ -245,6 +246,7 @@ def _analyze_places(session: Session, user_id_hash: str, args: AnalyzePlacesArgs
         sources=sources,
         layer=args.layer,
     )
+    run_id = latest_analysis_run_id(session, user_id_hash)
     neighborhood = neighborhood_analysis_for_places(
         session=session,
         user_id_hash=user_id_hash,
@@ -283,6 +285,7 @@ def _analyze_places(session: Session, user_id_hash: str, args: AnalyzePlacesArgs
         "matched": resolved.matched,
         "created": resolved.created,
         "unresolved": resolved.unresolved,
+        "analysis_run_id": run_id,
     }
 
 
@@ -310,6 +313,9 @@ def _compare_places(
         sources=sources,
         layer=args.layer,
     )
+    # Capture before compare_selected_places creates its own (category-less) run —
+    # the analyze run above is the one that carries the user's filters.
+    run_id = latest_analysis_run_id(session, user_id_hash)
     comparison = compare_selected_places(
         session=session,
         user_id_hash=user_id_hash,
@@ -329,6 +335,7 @@ def _compare_places(
         "matched": resolved.matched,
         "created": resolved.created,
         "unresolved": resolved.unresolved,
+        "analysis_run_id": run_id,
     }
 
 

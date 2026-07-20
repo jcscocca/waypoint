@@ -3,7 +3,10 @@ import { useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 
 import type { AssistantCommandName } from "../api/client";
+import type { FollowupChip } from "../lib/followupChips";
 import type { ThreadItem } from "../lib/threadItems";
+import type { AnalysisCardData } from "../types";
+import { AnalysisCard } from "./AnalysisCard";
 import { TabbyAvatar } from "./TabbyAvatar";
 
 type SuggestedAction = { label: string; command?: AssistantCommandName };
@@ -18,6 +21,13 @@ type Props = {
   onSend: (text: string) => void;
   onRetry: () => void;
   onRunCommand: (label: string, command: AssistantCommandName) => void;
+  followupChips: FollowupChip[];
+  onFollowupChip: (chip: FollowupChip) => void;
+  /** Keyed by card object identity, not thread index — the thread cap drops oldest items
+   * and shifts indices, but card references survive the slice. */
+  expandedCard: AnalysisCardData | null;
+  onCardExpandChange: (card: AnalysisCardData, expanded: boolean) => void;
+  exportHrefBase: string;
   contextStrip?: ReactNode;
 };
 
@@ -27,7 +37,7 @@ const SUGGESTED_ACTIONS: SuggestedAction[] = [
   { label: "What's on file around here?" }, // free-text — needs the LLM
 ];
 
-const OFFLINE_COMPOSER_HINT = "Tabby can't reach the case files — your filters and Retry still work.";
+const OFFLINE_COMPOSER_HINT = "Tabby can't reach the case files — chips and filters still work.";
 
 const GREETED_KEY = "wp-copper-greeted";
 
@@ -41,6 +51,11 @@ export function AssistantPanel({
   onSend,
   onRetry,
   onRunCommand,
+  followupChips,
+  onFollowupChip,
+  expandedCard,
+  onCardExpandChange,
+  exportHrefBase,
   contextStrip,
 }: Props) {
   const [input, setInput] = useState("");
@@ -94,16 +109,30 @@ export function AssistantPanel({
           if (item.kind === "receipt") {
             return <div key={index} className="mc-dock-msg is-receipt">{item.text}</div>;
           }
-          return (
-            <div key={index} className="mc-dock-msg is-notice">
-              <p>{item.text}</p>
-              {items.slice(index + 1).every((later) => later.kind === "receipt") ? (
-                <button type="button" className="mc-chip" onClick={onRetry} disabled={busy}>
-                  Retry
-                </button>
-              ) : null}
-            </div>
-          );
+          if (item.kind === "notice") {
+            return (
+              <div key={index} className="mc-dock-msg is-notice">
+                <p>{item.text}</p>
+                {items.slice(index + 1).every((later) => later.kind === "receipt") ? (
+                  <button type="button" className="mc-chip" onClick={onRetry} disabled={busy}>
+                    Retry
+                  </button>
+                ) : null}
+              </div>
+            );
+          }
+          if (item.kind === "analysis_card") {
+            return (
+              <AnalysisCard
+                key={index}
+                card={item.card}
+                expanded={expandedCard === item.card}
+                onExpandChange={(next) => onCardExpandChange(item.card, next)}
+                exportHrefBase={exportHrefBase}
+              />
+            );
+          }
+          return null;
         })}
         {!draft && statusLine ? (
           <div className="mc-dock-msg is-assistant mc-dock-statusline">{statusLine}</div>
@@ -138,6 +167,16 @@ export function AssistantPanel({
             <li key={`${item.label}-${index}`}>{item.label}</li>
           ))}
         </ul>
+      ) : null}
+
+      {followupChips.length > 0 && !busy ? (
+        <div className="mc-followups">
+          {followupChips.map((chip) => (
+            <button key={chip.label} type="button" className="mc-chip" onClick={() => onFollowupChip(chip)}>
+              {chip.label}
+            </button>
+          ))}
+        </div>
       ) : null}
 
       {contextStrip}

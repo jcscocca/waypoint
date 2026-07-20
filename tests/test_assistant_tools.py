@@ -389,6 +389,31 @@ def test_analyze_places_bundles_neighborhood_and_incidents(tmp_path):
     assert payload["unresolved"] == []
 
 
+def test_analyze_places_returns_analysis_run_id(tmp_path):
+    session, user_hash, place_id = session_with_places_and_beat_crime(tmp_path)
+    try:
+        result = execute_tool(
+            session,
+            user_hash,
+            "analyze_places",
+            {
+                "place_ids": [place_id],  # no queries -> use selection
+                "analysis_start_date": "2026-01-01",
+                "analysis_end_date": "2026-06-30",
+                "radii_m": [250],
+            },
+        )
+        run_id = result["result"]["analysis_run_id"]
+        assert isinstance(run_id, str) and run_id
+        # The id must reference a persisted run owned by this user.
+        from app.models import AnalysisRun
+
+        run = session.get(AnalysisRun, run_id)
+        assert run is not None and run.user_id_hash == user_hash
+    finally:
+        session.close()
+
+
 def test_compare_places_by_name_persists_analysis_and_compares(tmp_path, monkeypatch):
     session, user_hash = _session_with_place_and_crime(tmp_path)
     # Add a second place so a comparison is possible.
@@ -433,6 +458,46 @@ def test_compare_places_by_name_persists_analysis_and_compares(tmp_path, monkeyp
     assert "comparison" in payload
     assert payload["created"] == []
     assert payload["unresolved"] == []
+
+
+def test_compare_places_returns_analysis_run_id(tmp_path, monkeypatch):
+    session, user_hash = _session_with_place_and_crime(tmp_path)
+    # Add a second place so a comparison is possible.
+    session.add(
+        PlaceCluster(
+            id="place-2",
+            user_id_hash=user_hash,
+            cluster_version="manual-v1",
+            cluster_method="manual",
+            centroid_latitude=47.62,
+            centroid_longitude=-122.34,
+            display_latitude=47.62,
+            display_longitude=-122.34,
+            visit_count=1,
+            sensitivity_class="normal",
+            display_label="Second stop",
+            inferred_place_type="manual_place",
+            label_source="manual",
+        )
+    )
+    session.commit()
+    monkeypatch.setattr("app.assistant.tools.build_provider", lambda settings: _FakeProvider([]))
+    try:
+        result = execute_tool(
+            session,
+            user_hash,
+            "compare_places",
+            {
+                "queries": ["Library stop", "Second stop"],
+                "analysis_start_date": "2024-01-01",
+                "analysis_end_date": "2024-01-31",
+                "radius_m": 250,
+                "offense_category": "PROPERTY",
+            },
+        )
+    finally:
+        session.close()
+    assert result["result"]["analysis_run_id"]
 
 
 def test_compare_places_requires_two_places(tmp_path, monkeypatch):

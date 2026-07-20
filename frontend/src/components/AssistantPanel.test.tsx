@@ -5,14 +5,35 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AssistantPanel } from "./AssistantPanel";
+import type { FollowupChip } from "../lib/followupChips";
 import type { ThreadItem } from "../lib/threadItems";
+import type { AnalysisCardData } from "../types";
 
 type PanelProps = React.ComponentProps<typeof AssistantPanel>;
+
+const analyzeCard: AnalysisCardData = {
+  runId: "run-7",
+  kind: "analyze",
+  placeIds: ["p1"],
+  settings: { radius_m: 250, analysis_start_date: "2026-01-01", analysis_end_date: "2026-07-19", offense_category: null, layer: "reported" },
+  comparison: null,
+  neighborhood: null,
+  incidents: null,
+};
+
+const widenChip: FollowupChip = {
+  label: "Widen to 500 m",
+  command: "analyze_places",
+  argsPatch: { radii_m: [500] },
+  settingsPatch: { radius_m: 500 },
+};
 
 function setup(overrides: Partial<PanelProps> = {}) {
   const onSend = vi.fn();
   const onRetry = vi.fn();
   const onRunCommand = vi.fn();
+  const onFollowupChip = vi.fn();
+  const onCardExpandChange = vi.fn();
   const props: PanelProps = {
     items: [],
     busy: false,
@@ -23,10 +44,16 @@ function setup(overrides: Partial<PanelProps> = {}) {
     onSend,
     onRetry,
     onRunCommand,
+    followupChips: [],
+    onFollowupChip,
+    expandedCard: null,
+    onCardExpandChange,
+    exportHrefBase: "/exports/tableau/place-summary.csv",
     ...overrides,
   };
-  render(<AssistantPanel {...props} />);
-  return { onSend, onRetry, onRunCommand };
+  const view = render(<AssistantPanel {...props} />);
+  const rerender = (next: Partial<PanelProps>) => view.rerender(<AssistantPanel {...props} {...next} />);
+  return { onSend, onRetry, onRunCommand, onFollowupChip, onCardExpandChange, rerender };
 }
 
 beforeEach(() => localStorage.clear());
@@ -72,7 +99,7 @@ describe("AssistantPanel", () => {
     expect(screen.getByLabelText("Analyst message")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "What's on file around here?" })).toBeDisabled();
-    expect(screen.getByText(/your filters and retry still work/i)).toBeInTheDocument();
+    expect(screen.getByText(/chips and filters still work/i)).toBeInTheDocument();
     // Command chips stay enabled — the degraded path still runs structured commands.
     // (Offline + chips-on-screen only co-occurs today on an empty thread; the state
     // becomes generally reachable when persistent chips land in slice 3.)
@@ -85,6 +112,78 @@ describe("AssistantPanel", () => {
   it("renders the draft prop as a single in-flight bubble alongside committed items", () => {
     setup({ items: [{ kind: "user_text", text: "go" }], draft: "Working…" });
     expect(screen.getByText("go")).toBeInTheDocument();
+    expect(screen.getAllByText("Working…")).toHaveLength(1);
+  });
+
+  it("renders an analysis_card item in the thread and forwards its expand toggle with the card object", () => {
+    const { onCardExpandChange } = setup({
+      items: [
+        { kind: "user_text", text: "analyze Home" },
+        { kind: "analysis_card", card: analyzeCard },
+      ] as ThreadItem[],
+    });
+    expect(screen.getByText("Analysis")).toBeInTheDocument();
+    expect(screen.getByText(/250 m/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
+    expect(onCardExpandChange).toHaveBeenCalledWith(analyzeCard, true);
+  });
+
+  it("expands the card matching expandedCard by object identity", () => {
+    setup({
+      items: [{ kind: "analysis_card", card: analyzeCard }] as ThreadItem[],
+      expandedCard: analyzeCard,
+    });
+    expect(screen.getByRole("button", { name: "Collapse" })).toBeInTheDocument();
+  });
+
+  it("keeps the SAME card expanded when a thread-cap drop shifts its index", () => {
+    // The thread cap slices oldest items off the front, moving every survivor down an
+    // index. Expansion is keyed by card object identity, so the card must stay expanded.
+    const { rerender } = setup({
+      items: [
+        { kind: "user_text", text: "oldest — about to drop" },
+        { kind: "analysis_card", card: analyzeCard },
+      ] as ThreadItem[],
+      expandedCard: analyzeCard,
+    });
+    expect(screen.getByRole("button", { name: "Collapse" })).toBeInTheDocument();
+    rerender({
+      items: [{ kind: "analysis_card", card: analyzeCard }] as ThreadItem[],
+    });
+    expect(screen.getByRole("button", { name: "Collapse" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand" })).not.toBeInTheDocument();
+  });
+
+  it("renders the follow-up chip row when chips are present and forwards clicks", () => {
+    const { onFollowupChip } = setup({ followupChips: [widenChip] });
+    const chip = screen.getByRole("button", { name: "Widen to 500 m" });
+    expect(chip.closest(".mc-followups")).toBeInTheDocument();
+    fireEvent.click(chip);
+    expect(onFollowupChip).toHaveBeenCalledWith(widenChip);
+  });
+
+  it("hides the follow-up chip row while a turn is busy", () => {
+    setup({ followupChips: [widenChip], busy: true });
+    expect(screen.queryByRole("button", { name: "Widen to 500 m" })).not.toBeInTheDocument();
+  });
+
+  it("keeps follow-up chips live while offline (the degraded command path)", () => {
+    const { onFollowupChip } = setup({ followupChips: [widenChip], offline: true });
+    const chip = screen.getByRole("button", { name: "Widen to 500 m" });
+    expect(chip).not.toBeDisabled();
+    fireEvent.click(chip);
+    expect(onFollowupChip).toHaveBeenCalledWith(widenChip);
+  });
+
+  it("folds the in-flight draft after a card item without index collision", () => {
+    setup({
+      items: [
+        { kind: "user_text", text: "analyze Home" },
+        { kind: "analysis_card", card: analyzeCard },
+      ] as ThreadItem[],
+      draft: "Working…",
+    });
+    expect(screen.getByText("Analysis")).toBeInTheDocument();
     expect(screen.getAllByText("Working…")).toHaveLength(1);
   });
 

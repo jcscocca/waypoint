@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_user_hash, required_public_user_hash
@@ -16,8 +16,12 @@ router = APIRouter()
 def export_place_summary(
     user_id_hash: Annotated[str, Depends(required_public_user_hash)],
     session: Annotated[Session, Depends(get_session)],
+    run_id: Annotated[str | None, Query()] = None,
 ) -> Response:
-    return _place_summary_response(session, user_id_hash)
+    try:
+        return _place_summary_response(session, user_id_hash, run_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Analysis run not found.") from exc
 
 
 @router.get("/internal/exports/tableau/place-summary.csv", include_in_schema=False)
@@ -28,9 +32,11 @@ def export_internal_place_summary(
     return _place_summary_response(session, user_id_hash)
 
 
-def _place_summary_response(session: Session, user_id_hash: str) -> Response:
+def _place_summary_response(
+    session: Session, user_id_hash: str, run_id: str | None = None
+) -> Response:
     return Response(
-        content=tableau_place_summary_csv(session, user_id_hash),
+        content=tableau_place_summary_csv(session, user_id_hash, run_id),
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=place-summary.csv"},
     )

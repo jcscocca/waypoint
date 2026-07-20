@@ -1,22 +1,18 @@
 import type {
+  AnalysisCardData,
   AnalysisSettings,
   AssistantToolEffect,
   IncidentDetailsResponse,
-  LayerKey,
   NeighborhoodAnalysis,
+  SettingsUsed,
   SiteComparison,
 } from "../types";
 
-// Mirrors the backend `_settings_used` echo (app/assistant/tools.py): only the fields the
-// dashboard's AnalysisSettings can apply. offense_subcategory / nibrs_group are honored as
-// filters server-side but intentionally not echoed (no UI control), keeping the contract 1:1.
-type SettingsUsed = {
-  radius_m?: number;
-  analysis_start_date?: string;
-  analysis_end_date?: string;
-  offense_category?: string | null;
-  layer?: LayerKey;
-};
+// SettingsUsed / AnalysisCardData are defined in types.ts (not here) to keep imports
+// one-way: types.ts has no dependency on this module, so both this bridge and
+// threadItems.ts can import from it without a cycle. Re-exported so existing/expected
+// import sites (`from "./assistantBridge"`) keep working.
+export type { AnalysisCardData, SettingsUsed };
 
 function settingsFrom(used: SettingsUsed | undefined): Partial<AnalysisSettings> {
   if (!used) return {};
@@ -37,23 +33,46 @@ export function interpretToolResult(data: {
 }): AssistantToolEffect | null {
   const result = (data.result ?? {}) as Record<string, unknown>;
   switch (data.tool_name) {
-    case "compare_places":
+    case "compare_places": {
+      const placeIds = Array.isArray(result.place_ids) ? (result.place_ids as string[]) : [];
+      const comparison = (result.comparison as SiteComparison) ?? null;
       return {
-        selection: { mode: "replace", ids: Array.isArray(result.place_ids) ? (result.place_ids as string[]) : [] },
+        selection: { mode: "replace", ids: placeIds },
         settings: settingsFrom(result.settings_used as SettingsUsed),
-        comparison: (result.comparison as SiteComparison) ?? null,
+        comparison,
         refetchSummary: true,
-        tab: "compare",
+        card: {
+          runId: typeof result.analysis_run_id === "string" ? result.analysis_run_id : null,
+          kind: "compare",
+          placeIds,
+          settings: (result.settings_used as SettingsUsed) ?? {},
+          comparison,
+          neighborhood: null,
+          incidents: null,
+        },
       };
-    case "analyze_places":
+    }
+    case "analyze_places": {
+      const placeIds = Array.isArray(result.place_ids) ? (result.place_ids as string[]) : [];
+      const neighborhood = (result.neighborhood as NeighborhoodAnalysis) ?? null;
+      const incidents = (result.incidents as IncidentDetailsResponse) ?? null;
       return {
-        selection: { mode: "replace", ids: Array.isArray(result.place_ids) ? (result.place_ids as string[]) : [] },
+        selection: { mode: "replace", ids: placeIds },
         settings: settingsFrom(result.settings_used as SettingsUsed),
-        neighborhood: (result.neighborhood as NeighborhoodAnalysis) ?? null,
-        incidents: (result.incidents as IncidentDetailsResponse) ?? null,
+        neighborhood,
+        incidents,
         refetchSummary: true,
-        tab: "compare",
+        card: {
+          runId: typeof result.analysis_run_id === "string" ? result.analysis_run_id : null,
+          kind: "analyze",
+          placeIds,
+          settings: (result.settings_used as SettingsUsed) ?? {},
+          comparison: null,
+          neighborhood,
+          incidents,
+        },
       };
+    }
     case "add_place": {
       const place = (result.place ?? {}) as { id?: string };
       if (!place.id) return null;

@@ -174,6 +174,22 @@ describe("api client", () => {
     expect(events).toContain("error");
   });
 
+  it("passes the abort signal through to fetch", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(sseResponse("event: done\ndata: {}\n\n"));
+
+    await streamAssistantChat(
+      { messages: [{ role: "user", content: "hi" }], dashboard_state: emptyDashboardState },
+      { onEvent: () => {} },
+      controller.signal,
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/assistant/chat",
+      expect.objectContaining({ signal: controller.signal }),
+    );
+  });
+
   it("streams command events from /assistant/commands", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       sseResponse(

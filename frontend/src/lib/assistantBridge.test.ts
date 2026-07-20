@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { interpretToolResult } from "./assistantBridge";
 
 describe("interpretToolResult", () => {
-  it("maps compare_places to a replace-selection + compare effect on the Compare tab", () => {
+  it("maps compare_places to a replace-selection + compare effect, no view switch", () => {
     const effect = interpretToolResult({
       tool_name: "compare_places",
       result: {
@@ -21,11 +21,24 @@ describe("interpretToolResult", () => {
       settings: { radiusM: 500, startDate: "2026-01-01", endDate: "2026-06-30", offenseCategory: "PROPERTY" },
       comparison: { overview: { summary_text: "more incidents at a" } },
       refetchSummary: true,
-      tab: "compare",
+      card: {
+        runId: null,
+        kind: "compare",
+        placeIds: ["a", "b"],
+        settings: {
+          radius_m: 500,
+          analysis_start_date: "2026-01-01",
+          analysis_end_date: "2026-06-30",
+          offense_category: "PROPERTY",
+        },
+        comparison: { overview: { summary_text: "more incidents at a" } },
+        neighborhood: null,
+        incidents: null,
+      },
     });
   });
 
-  it("maps analyze_places to neighborhood + incidents on the Compare tab", () => {
+  it("maps analyze_places to neighborhood + incidents, no view switch", () => {
     const effect = interpretToolResult({
       tool_name: "analyze_places",
       result: {
@@ -35,12 +48,48 @@ describe("interpretToolResult", () => {
         incidents: { incidents: [], returned_count: 0, total_count: 0, limit: 100, radius_m: 250 },
       },
     });
-    expect(effect?.tab).toBe("compare");
+    expect(effect).not.toHaveProperty("tab");
     expect(effect?.selection).toEqual({ mode: "replace", ids: ["a"] });
     expect(effect?.settings?.radiusM).toBe(250);
     expect(effect?.settings?.offenseCategory).toBe("");
     expect(effect?.neighborhood).toEqual({ radius_m: 250, places: [], pairwise: [] });
     expect(effect?.refetchSummary).toBe(true);
+    expect(effect?.card).toEqual({
+      runId: null,
+      kind: "analyze",
+      placeIds: ["a"],
+      settings: { radius_m: 250, analysis_start_date: "2026-01-01", analysis_end_date: "2026-06-30", offense_category: null },
+      comparison: null,
+      neighborhood: { radius_m: 250, places: [], pairwise: [] },
+      incidents: { incidents: [], returned_count: 0, total_count: 0, limit: 100, radius_m: 250 },
+    });
+  });
+
+  it("carries a string analysis_run_id through as card.runId", () => {
+    const effect = interpretToolResult({
+      tool_name: "analyze_places",
+      result: {
+        place_ids: ["a"],
+        settings_used: { radius_m: 250, analysis_start_date: "2026-01-01", analysis_end_date: "2026-06-30", offense_category: null },
+        neighborhood: { radius_m: 250, places: [], pairwise: [] },
+        incidents: { incidents: [], returned_count: 0, total_count: 0, limit: 100, radius_m: 250 },
+        analysis_run_id: "run-123",
+      },
+    });
+    expect(effect?.card?.runId).toBe("run-123");
+  });
+
+  it("yields card.runId: null when analysis_run_id is missing or not a string", () => {
+    const effect = interpretToolResult({
+      tool_name: "compare_places",
+      result: {
+        place_ids: ["a", "b"],
+        settings_used: { radius_m: 250, analysis_start_date: "2026-01-01", analysis_end_date: "2026-06-30", offense_category: null },
+        comparison: null,
+        analysis_run_id: null,
+      },
+    });
+    expect(effect?.card?.runId).toBeNull();
   });
 
   it("reflects the arrests layer from settings_used into effect.settings.layer", () => {

@@ -1,13 +1,15 @@
 import type { AssistantMessage } from "../types";
+import type { AnalysisCardData } from "./assistantBridge";
 
 /** One entry in the Tabby rail. Only user/tabby text round-trips to the LLM;
- * receipts and notices are local-only records (deterministic confirmations,
- * errors) per the Tabby-central spec. */
+ * receipts, notices, and analysis cards are local-only records (deterministic
+ * confirmations, errors, frozen analysis snapshots) per the Tabby-central spec. */
 export type ThreadItem =
   | { kind: "user_text"; text: string }
   | { kind: "tabby_text"; text: string }
   | { kind: "receipt"; text: string }
-  | { kind: "notice"; text: string };
+  | { kind: "notice"; text: string }
+  | { kind: "analysis_card"; card: AnalysisCardData };
 
 export function toApiMessages(items: ThreadItem[]): AssistantMessage[] {
   const messages: AssistantMessage[] = [];
